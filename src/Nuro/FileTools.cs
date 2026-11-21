@@ -20,7 +20,7 @@ public sealed class FileTools
 
     private string[] Roots => _c.Folders.Where(Directory.Exists).Select(Norm).ToArray();
 
-    private string Resolve(string path)
+    public string Resolve(string path)
     {
         var roots = Roots;
         if (roots.Length == 0)
@@ -28,7 +28,12 @@ public sealed class FileTools
         if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Pfad fehlt.");
 
         var p = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
-        var full = Norm(Path.IsPathRooted(p) ? p : Path.Combine(roots[0], p));
+        // Lokale Werkzeuge brauchen einen vollständigen Windows-Pfad. Pfade wie "src/Nuro/Tools.cs" sind GitHub-Pfade.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(p, @"^[A-Za-z]:[\\/]") && !p.StartsWith(@"\\"))
+            throw new ArgumentException(
+                $"„{path}“ ist kein vollständiger lokaler Windows-Pfad (z. B. {roots[0]}\\datei.txt). " +
+                "Falls eine Datei im GitHub-Repository gemeint ist, verwende die gh_*-Werkzeuge – lokale Werkzeuge sehen nur Dateien auf dem PC.");
+        var full = Norm(p);
         foreach (var r in roots)
         {
             var prefix = r.EndsWith('\\') ? r : r + "\\";

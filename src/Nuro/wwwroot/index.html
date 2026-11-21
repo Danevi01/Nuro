@@ -42,7 +42,7 @@ input,textarea,select{font:inherit;color:var(--text)}
 .ib{background:none;border:none;padding:3px 5px;border-radius:6px;color:var(--muted);line-height:1}
 .ib:hover{background:var(--line);color:var(--text)}
 .side-foot{border-top:1px solid var(--line);padding:8px 12px;display:flex;gap:6px}
-.side-foot button{flex:1}
+.side-foot button{flex:1;white-space:nowrap;font-size:13.5px;padding:8px 6px}
 
 /* Hauptbereich */
 #main{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -166,6 +166,38 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
 .folders .f span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .small{font-size:12.5px;color:var(--muted)}
 .ok-t{color:#5cb85c}.bad-t{color:var(--err)}
+/* Rückfragen, Gedächtnis, Modelle */
+.askcard{border:1px solid var(--accent);border-radius:12px;background:var(--surf);padding:12px 14px;margin:8px 0}
+.askcard.done{border-color:var(--line);padding:8px 12px}
+.askcard.warn{border-color:#d9a441}
+.askcard .q{font-weight:600;margin-bottom:8px}
+.askcard.done .q{font-weight:500;margin-bottom:2px;color:var(--muted);font-size:14px}
+.askcard .ans{font-size:14.5px}
+.askcard .opts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.askcard .opt{border:1px solid var(--line);background:var(--surf2);border-radius:20px;padding:6px 14px;font-size:14px;text-align:left}
+.askcard button.opt:hover{border-color:var(--accent);color:var(--accent)}
+.askcard .opt.chk{display:flex;align-items:center;gap:6px;cursor:pointer}
+.askcard .own{display:flex;gap:6px}
+.askcard .own input{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none}
+.askcard .own input:focus{border-color:var(--accent)}
+.askcard pre{background:var(--code);border-radius:8px;padding:8px 10px;margin:4px 0;white-space:pre-wrap;word-break:break-all;font:13px Consolas,monospace}
+.place{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:5px;letter-spacing:.3px}
+.place.gh{background:#2d333b;color:#cdd9e5}.place.pc{background:#2f4a36;color:#b6e3c0}
+:root.light .place.gh{background:#e1e4e8;color:#24292f}:root.light .place.pc{background:#dcf5e3;color:#1f5130}
+.memrow{display:flex;gap:8px;align-items:flex-start;padding:7px 4px;border-bottom:1px solid var(--line);font-size:14px}
+.memrow .tx{flex:1}
+.memrow .ct{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;white-space:nowrap;margin-top:2px}
+.memlist{max-height:46vh;overflow:auto;margin:8px 0}
+.mrow{display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid var(--line)}
+.mrow .nm{font-weight:600}.mrow .sz{color:var(--muted);font-size:13px}
+.mrow .sp{flex:1}
+.mrow.active{background:var(--surf2);border-radius:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chips button{border:1px solid var(--line);background:var(--surf);border-radius:10px;padding:5px 10px;font-size:13px;text-align:left}
+.chips button:hover{border-color:var(--accent)}
+.chips button .fit{color:#5cb85c}.chips button .nofit{color:#d9a441}
+.bar{height:8px;background:var(--surf2);border-radius:6px;overflow:hidden;margin:8px 0 4px}
+.bar>div{height:100%;width:0;background:var(--accent);transition:width .3s}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
 </style>
 </head>
@@ -177,6 +209,7 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
     <input id="search" placeholder="Chats durchsuchen …">
     <div id="chatlist"></div>
     <div class="side-foot">
+      <button class="btn" id="openMemory" style="display:none">🧠 Gedächtnis</button>
       <button class="btn" id="openSettings">⚙ Einstellungen</button>
     </div>
   </aside>
@@ -270,12 +303,44 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
     </div>
   </div>
 </div>
+<div class="modal" id="memModal">
+  <div class="dlg">
+    <h2>🧠 Gedächtnis</h2>
+    <div class="small">Das weiß Nuro über dich und eure Projekte. Nuro nutzt es bei jeder Aufgabe und kann zusätzlich frühere Chats durchsuchen.</div>
+    <div class="fld"><label><input type="checkbox" id="mAuto"> Nach jeder Antwort automatisch Wichtiges merken</label></div>
+    <input id="mSearch" placeholder="Durchsuchen …" style="width:100%;background:var(--surf);border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none">
+    <div class="memlist" id="memList"></div>
+    <div class="row2" style="align-items:flex-end">
+      <div class="fld" style="flex:3"><label>Neue Erinnerung</label><input type="text" id="mText" placeholder="z. B. Rust-Plugins schreibe ich mit Carbon"></div>
+      <div class="fld"><label>Kategorie</label><select id="mCat"><option>projekt</option><option>person</option><option>vorliebe</option><option>wissen</option><option>sonstiges</option></select></div>
+    </div>
+    <div class="foot"><span id="mCount" class="small" style="flex:1;align-self:center"></span><button class="btn" id="mAdd">Hinzufügen</button><button class="btn pri" id="mClose">Schließen</button></div>
+  </div>
+</div>
+
+<div class="modal" id="modelModal">
+  <div class="dlg">
+    <h2>Modelle</h2>
+    <div class="small" id="mmGpu"></div>
+    <div id="mmList" style="margin:8px 0 4px"></div>
+    <div class="sec">
+      <h3>Neues Modell herunterladen</h3>
+      <div class="small">Name aus der <a href="https://ollama.com/search?c=tools" target="_blank" style="color:var(--accent)">Ollama-Bibliothek</a> eintragen (z. B. <code>gpt-oss:20b</code>) oder einen Vorschlag wählen. Für das selbstständige Arbeiten braucht das Modell die Fähigkeit „Werkzeuge“.</div>
+      <div class="chips" id="mmSuggest"></div>
+      <div style="display:flex;gap:8px"><input type="text" id="mmName" placeholder="modell:größe" style="flex:1;background:var(--surf);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:none">
+        <button class="btn pri" id="mmPull">Herunterladen</button></div>
+      <div id="mmProg" style="display:none"><div class="bar"><div id="mmBar"></div></div>
+        <div style="display:flex;gap:8px;align-items:center"><span class="small" id="mmStat" style="flex:1"></span><button class="btn" id="mmCancel">Abbrechen</button></div></div>
+    </div>
+    <div class="foot"><button class="btn pri" id="mmClose">Schließen</button></div>
+  </div>
+</div>
 <input type="file" id="importFile" accept=".json" hidden>
 
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
-const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:16384, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false, tools:true, maxSteps:25};
+const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:16384, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false, tools:true, maxSteps:30, autoMemory:true};
 let S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('nuro_settings') || '{}'));
 const saveS = () => localStorage.setItem('nuro_settings', JSON.stringify(S));
 const base = () => S.url.replace(/\/+$/, '');
@@ -296,42 +361,110 @@ const toolsOn = () => !!NURO && S.tools && caps.includes('tools');
 const fn = (name, description, props = {}, required = []) =>
   ({type:'function', function:{name, description, parameters:{type:'object', properties:props, required}}});
 const str = d => ({type:'string', description:d}), int = d => ({type:'integer', description:d}), bool = d => ({type:'boolean', description:d});
+const arr = (d, items) => ({type:'array', description:d, items});
+const L = '[LOKAL – PC des Nutzers, vollständiger Windows-Pfad wie C:\\Ordner\\datei.txt] ';
+const G = '[GITHUB – Repository, Pfad relativ zur Repo-Wurzel mit /, z. B. src/Nuro/Tools.cs] ';
 const TOOLS = [
-  fn('list_allowed_folders', 'Zeigt die Ordner, auf die du Zugriff hast.'),
-  fn('list_dir', 'Listet Dateien und Unterordner eines Ordners.', {path:str('Vollständiger Ordnerpfad'), recursive:bool('Auch Unterordner auflisten')}, ['path']),
-  fn('read_file', 'Liest eine Textdatei (zeilenweise, max. 400 Zeilen pro Aufruf).', {path:str('Vollständiger Dateipfad'), start_line:int('Erste Zeile (ab 1)'), max_lines:int('Anzahl Zeilen')}, ['path']),
-  fn('write_file', 'Erstellt oder überschreibt eine Textdatei (legt fehlende Ordner an).', {path:str('Vollständiger Dateipfad'), content:str('Kompletter neuer Inhalt'), append:bool('Anhängen statt überschreiben')}, ['path', 'content']),
-  fn('edit_file', 'Ersetzt in einer Datei einen exakt vorkommenden Textabschnitt (muss genau einmal vorkommen).', {path:str('Vollständiger Dateipfad'), old_text:str('Exakter alter Text'), new_text:str('Neuer Text')}, ['path', 'old_text', 'new_text']),
-  fn('create_folder', 'Legt einen Ordner an.', {path:str('Vollständiger Ordnerpfad')}, ['path']),
-  fn('delete_path', 'Löscht eine Datei oder einen Ordner samt Inhalt.', {path:str('Vollständiger Pfad')}, ['path']),
-  fn('move_path', 'Verschiebt oder benennt eine Datei/einen Ordner um.', {from:str('Quellpfad'), to:str('Zielpfad')}, ['from', 'to']),
-  fn('search_files', 'Sucht Dateien nach Namensmuster und optional nach Text im Inhalt.', {path:str('Ordner, in dem gesucht wird'), name_pattern:str('z. B. *.cs oder *config*'), contains:str('Gesuchter Text (optional)')}, ['path']),
-  fn('file_info', 'Größe und Datum einer Datei oder eines Ordners.', {path:str('Vollständiger Pfad')}, ['path']),
-  fn('gh_list', 'Listet Dateien in deinem GitHub-Repository.', {path:str('Ordner im Repo, leer = Wurzel'), recursive:bool('Gesamten Baum auflisten')}),
-  fn('gh_read', 'Liest eine Datei aus deinem GitHub-Repository.', {path:str('Pfad im Repo, z. B. src/Nuro/wwwroot/index.html')}, ['path']),
-  fn('gh_write', 'Schreibt eine Datei ins GitHub-Repository und committet sie direkt (kompletter Inhalt).', {path:str('Pfad im Repo'), content:str('Kompletter neuer Dateiinhalt'), message:str('Commit-Nachricht')}, ['path', 'content', 'message']),
-  fn('gh_edit', 'Ersetzt in einer Repo-Datei einen exakt vorkommenden Textabschnitt und committet (besser als gh_write für kleine Änderungen an großen Dateien).', {path:str('Pfad im Repo'), old_text:str('Exakter alter Text (genau einmal vorhanden)'), new_text:str('Neuer Text'), message:str('Commit-Nachricht')}, ['path', 'old_text', 'new_text', 'message']),
-  fn('gh_delete', 'Löscht eine Datei im GitHub-Repository (mit Commit).', {path:str('Pfad im Repo'), message:str('Commit-Nachricht')}, ['path', 'message']),
-  fn('gh_commits', 'Zeigt die letzten Commits.', {limit:int('Anzahl, Standard 10')}),
-  fn('gh_issues', 'Listet Issues.', {state:str('open, closed oder all')}),
-  fn('gh_issue_read', 'Liest ein Issue mit Kommentaren.', {number:int('Issue-Nummer')}, ['number']),
-  fn('gh_issue_create', 'Legt ein Issue an.', {title:str('Titel'), body:str('Beschreibung (Markdown)')}, ['title']),
-  fn('gh_issue_comment', 'Kommentiert ein Issue.', {number:int('Issue-Nummer'), body:str('Kommentar')}, ['number', 'body']),
-  fn('gh_issue_close', 'Schließt ein Issue.', {number:int('Issue-Nummer')}, ['number']),
-  fn('gh_actions', 'Zeigt die letzten GitHub-Actions-Läufe (z. B. ob der exe-Build geklappt hat).', {limit:int('Anzahl, Standard 5')}),
-  fn('gpu_status', 'Zeigt Auslastung, Grafikspeicher und Temperatur der NVIDIA-Grafikkarte sowie die geladenen Modelle.'),
+  // Rückfragen & Gedächtnis
+  fn('ask_user', 'Stellt dem Nutzer eine Frage mit klickbaren Antwortmöglichkeiten (der Nutzer kann immer auch frei antworten). Verwende dies IMMER, wenn es mehrere sinnvolle Optionen gibt, statt die Optionen als Text aufzuzählen. Wartet auf die Antwort.',
+    {question:str('Die Frage'), options:arr('2 bis 6 kurze Antwortmöglichkeiten', {type:'string'}), multiple:bool('Mehrfachauswahl erlauben')}, ['question', 'options']),
+  fn('memory_save', 'Merkt sich einen dauerhaft nützlichen Fakt über den Nutzer, seine Projekte, Vorlieben oder Entscheidungen (ein kurzer, eigenständiger Satz). Mit replaces_id eine überholte Erinnerung ersetzen.',
+    {text:str('Der Fakt als kurzer Satz'), category:str('person, projekt, vorliebe, wissen oder sonstiges'), replaces_id:str('ID einer Erinnerung, die ersetzt werden soll (optional)')}, ['text']),
+  fn('memory_search', 'Durchsucht das Langzeitgedächtnis.', {query:str('Suchbegriffe')}, ['query']),
+  fn('memory_list', 'Listet alle Erinnerungen auf.'),
+  fn('memory_delete', 'Löscht eine Erinnerung.', {id:str('ID der Erinnerung')}, ['id']),
+  fn('chat_search', 'Durchsucht frühere Chats mit dem Nutzer nach Stichworten (z. B. um an eine frühere Aufgabe anzuknüpfen).', {query:str('Suchbegriffe')}, ['query']),
+  fn('chat_read', 'Liest den Verlauf eines früheren Chats.', {chat_id:str('ID aus chat_search')}, ['chat_id']),
+  // Lokal
+  fn('list_allowed_folders', L + 'Zeigt die freigegebenen lokalen Ordner.'),
+  fn('list_dir', L + 'Listet Dateien und Unterordner.', {path:str('Vollständiger lokaler Ordnerpfad'), recursive:bool('Auch Unterordner')}, ['path']),
+  fn('read_file', L + 'Liest eine lokale Textdatei (max. 400 Zeilen pro Aufruf).', {path:str('Vollständiger lokaler Dateipfad'), start_line:int('Erste Zeile (ab 1)'), max_lines:int('Anzahl Zeilen')}, ['path']),
+  fn('write_file', L + 'Erstellt oder überschreibt eine lokale Textdatei.', {path:str('Vollständiger lokaler Dateipfad'), content:str('Kompletter Inhalt'), append:bool('Anhängen statt überschreiben')}, ['path', 'content']),
+  fn('edit_file', L + 'Ersetzt in einer lokalen Datei einen exakt (genau einmal) vorkommenden Textabschnitt.', {path:str('Vollständiger lokaler Dateipfad'), old_text:str('Exakter alter Text'), new_text:str('Neuer Text')}, ['path', 'old_text', 'new_text']),
+  fn('create_folder', L + 'Legt einen lokalen Ordner an.', {path:str('Vollständiger lokaler Ordnerpfad')}, ['path']),
+  fn('delete_path', L + 'Löscht eine lokale Datei oder einen Ordner samt Inhalt.', {path:str('Vollständiger lokaler Pfad')}, ['path']),
+  fn('move_path', L + 'Verschiebt/benennt eine lokale Datei oder einen Ordner um.', {from:str('Lokaler Quellpfad'), to:str('Lokaler Zielpfad')}, ['from', 'to']),
+  fn('search_files', L + 'Sucht lokale Dateien nach Namensmuster und optional Inhalt.', {path:str('Lokaler Ordner'), name_pattern:str('z. B. *.cs'), contains:str('Gesuchter Text (optional)')}, ['path']),
+  fn('file_info', L + 'Größe und Datum einer lokalen Datei.', {path:str('Vollständiger lokaler Pfad')}, ['path']),
+  fn('run_command', L + 'Führt einen Befehl in cmd.exe aus (z. B. dotnet build, git status, npm test). Der Nutzer muss jeden Befehl bestätigen. Das Arbeitsverzeichnis muss in einem freigegebenen Ordner liegen.',
+    {command:str('Der Befehl'), working_directory:str('Vollständiger lokaler Ordnerpfad'), timeout_seconds:int('Zeitlimit, Standard 120')}, ['command', 'working_directory']),
+  // GitHub
+  fn('gh_list', G + 'Listet Dateien im Repository (aktueller Arbeits-Branch, sonst main).', {path:str('Ordner im Repo, leer = Wurzel'), recursive:bool('Ganzen Baum auflisten')}),
+  fn('gh_read', G + 'Liest eine Repo-Datei zeilenweise (max. 600 Zeilen pro Aufruf, mit start_line weiterlesen).', {path:str('Repo-Pfad'), start_line:int('Erste Zeile (ab 1)'), max_lines:int('Anzahl Zeilen')}, ['path']),
+  fn('gh_branch_start', G + 'Startet einen neuen Arbeits-Branch für eine Aufgabe (passiert beim ersten Commit sonst automatisch).', {name:str('Kurzer Name der Aufgabe')}),
+  fn('gh_edit', G + 'Ersetzt in einer Repo-Datei einen exakt (genau einmal) vorkommenden Abschnitt und committet auf den Arbeits-Branch. Bevorzugt für Änderungen an bestehenden Dateien.', {path:str('Repo-Pfad'), old_text:str('Exakter alter Text'), new_text:str('Neuer Text'), message:str('Commit-Nachricht')}, ['path', 'old_text', 'new_text', 'message']),
+  fn('gh_write', G + 'Schreibt eine komplette Repo-Datei (neu oder überschreiben) und committet auf den Arbeits-Branch. Nur für neue oder kleine Dateien.', {path:str('Repo-Pfad'), content:str('Kompletter Dateiinhalt'), message:str('Commit-Nachricht')}, ['path', 'content', 'message']),
+  fn('gh_commit', G + 'Committet mehrere Repo-Dateien gemeinsam in EINEM Commit (für Änderungen, die zusammengehören, z. B. neue Klasse + Registrierung).', {files:arr('Dateien', {type:'object', properties:{path:str('Repo-Pfad'), content:str('Kompletter Inhalt')}, required:['path', 'content']}), delete:arr('Zu löschende Repo-Pfade', {type:'string'}), message:str('Commit-Nachricht')}, ['message']),
+  fn('gh_delete', G + 'Löscht eine Repo-Datei (Commit auf den Arbeits-Branch).', {path:str('Repo-Pfad'), message:str('Commit-Nachricht')}, ['path', 'message']),
+  fn('gh_build_wait', G + 'Wartet auf den Build des letzten Commits und liefert Erfolg oder die Fehlermeldungen aus dem Build-Log. Nach JEDEM Commit und nach gh_merge aufrufen.', {timeout_seconds:int('Maximale Wartezeit, Standard 600')}),
+  fn('gh_merge', G + 'Übernimmt den Arbeits-Branch in main (nur möglich, wenn der letzte Build erfolgreich war). main baut danach das Release.', {message:str('Merge-Nachricht')}),
+  fn('gh_branch_discard', G + 'Verwirft den Arbeits-Branch (main bleibt unverändert).'),
+  fn('gh_commits', G + 'Zeigt die letzten Commits.', {limit:int('Anzahl')}),
+  fn('gh_actions', G + 'Zeigt die letzten Build-Läufe und den aktiven Arbeits-Branch.', {limit:int('Anzahl')}),
+  fn('gh_issues', G + 'Listet Issues.', {state:str('open, closed oder all')}),
+  fn('gh_issue_read', G + 'Liest ein Issue mit Kommentaren.', {number:int('Issue-Nummer')}, ['number']),
+  fn('gh_issue_create', G + 'Legt ein Issue an.', {title:str('Titel'), body:str('Beschreibung')}, ['title']),
+  fn('gh_issue_comment', G + 'Kommentiert ein Issue.', {number:int('Issue-Nummer'), body:str('Kommentar')}, ['number', 'body']),
+  fn('gh_issue_close', G + 'Schließt ein Issue.', {number:int('Issue-Nummer')}, ['number']),
+  // Web & System
+  fn('web_fetch', 'Lädt eine Webseite (http/https) und gibt den Text zurück, z. B. Dokumentation.', {url:str('Vollständige URL')}, ['url']),
+  fn('gpu_status', 'Zeigt Auslastung, Grafikspeicher und Temperatur der NVIDIA-Grafikkarte und die geladenen Modelle.'),
 ];
-const TOOL_LABEL = {list_allowed_folders:'Freigaben ansehen', list_dir:'Ordner ansehen', read_file:'Datei lesen', write_file:'Datei schreiben', edit_file:'Datei ändern',
-  create_folder:'Ordner anlegen', delete_path:'Löschen', move_path:'Verschieben', search_files:'Dateien suchen', file_info:'Datei-Info',
-  gh_list:'GitHub: Dateien', gh_read:'GitHub: lesen', gh_write:'GitHub: committen', gh_edit:'GitHub: ändern',gh_delete:'GitHub: löschen', gh_commits:'GitHub: Commits',
-  gh_issues:'GitHub: Issues', gh_issue_read:'GitHub: Issue lesen', gh_issue_create:'GitHub: Issue anlegen', gh_issue_comment:'GitHub: kommentieren',
-  gh_issue_close:'GitHub: Issue schließen', gh_actions:'GitHub: Builds', gpu_status:'Grafikkarte'};
+const LOCAL_TOOLS = new Set(['ask_user', 'chat_search', 'chat_read']);
+const TOOL_LABEL = {ask_user:'Rückfrage', memory_save:'Merken', memory_search:'Gedächtnis durchsuchen', memory_list:'Gedächtnis ansehen', memory_delete:'Vergessen',
+  chat_search:'Frühere Chats durchsuchen', chat_read:'Früheren Chat lesen',
+  list_allowed_folders:'Freigaben ansehen', list_dir:'Ordner ansehen', read_file:'Datei lesen', write_file:'Datei schreiben', edit_file:'Datei ändern',
+  create_folder:'Ordner anlegen', delete_path:'Löschen', move_path:'Verschieben', search_files:'Dateien suchen', file_info:'Datei-Info', run_command:'Befehl ausführen',
+  gh_list:'GitHub: Dateien', gh_read:'GitHub: lesen', gh_branch_start:'GitHub: Branch starten', gh_write:'GitHub: Datei schreiben', gh_edit:'GitHub: ändern',
+  gh_commit:'GitHub: Commit', gh_delete:'GitHub: löschen', gh_build_wait:'GitHub: Build abwarten', gh_merge:'GitHub: in main übernehmen', gh_branch_discard:'GitHub: Branch verwerfen',
+  gh_commits:'GitHub: Commits', gh_actions:'GitHub: Builds', gh_issues:'GitHub: Issues', gh_issue_read:'GitHub: Issue lesen', gh_issue_create:'GitHub: Issue anlegen',
+  gh_issue_comment:'GitHub: kommentieren', gh_issue_close:'GitHub: Issue schließen', web_fetch:'Webseite laden', gpu_status:'Grafikkarte'};
+const toolPlace = n => n.startsWith('gh_') ? 'gh' : ['list_dir','read_file','write_file','edit_file','create_folder','delete_path','move_path','search_files','file_info','run_command','list_allowed_folders'].includes(n) ? 'pc' : '';
+
+let MEM = [];   // Langzeitgedächtnis (vom Host)
+async function loadMemory(){ if (NURO){ try { MEM = (await host('/api/memory', {action:'list'})).entries || []; } catch {} } return MEM; }
+const tok = s => (s || '').toLowerCase().split(/[^a-z0-9äöüß]+/).filter(w => w.length > 2);
+function memoryBlock(query){
+  if (!MEM.length) return '';
+  let pick = MEM;
+  if (MEM.length > 60){
+    const q = tok(query);
+    const score = m => { const t = m.text.toLowerCase(); return q.reduce((s, w) => s + (t.includes(w) ? 2 : 0), 0); };
+    const ranked = [...MEM].sort((a, b) => score(b) - score(a) || new Date(b.updated) - new Date(a.updated));
+    const newest = [...MEM].sort((a, b) => new Date(b.updated) - new Date(a.updated)).slice(0, 10);
+    pick = [...new Map([...ranked.slice(0, 40), ...newest].map(m => [m.id, m])).values()];
+  }
+  return `Was du dir über den Nutzer und eure Projekte gemerkt hast (Gedächtnis${MEM.length > pick.length ? `, Auswahl ${pick.length} von ${MEM.length} – mehr mit memory_search` : ''}):\n` +
+    pick.map(m => `- [${m.id}] (${m.category}) ${m.text}`).join('\n');
+}
+
 function toolSystemPrompt(){
   const folders = HS.folders.length ? HS.folders.join(', ') : '(noch keine – bitte den Nutzer, in den Einstellungen einen Ordner freizugeben)';
   return `Du bist Nuro, ein KI-Assistent, der lokal auf dem Windows-PC des Nutzers läuft (Modell ${S.model} über Ollama auf der NVIDIA-Grafikkarte).
-Du hast Werkzeuge und arbeitest selbstständig: Plane kurz, rufe Werkzeuge auf, prüfe die Ergebnisse und mach weiter, bis die Aufgabe erledigt ist. Frag nur nach, wenn etwas wirklich unklar ist. Erfinde keine Dateiinhalte – lies sie.
-Dateien: Du darfst in diesen Ordnern ohne Rückfrage lesen, schreiben, verschieben und löschen: ${folders}. Verwende vollständige Windows-Pfade. Lies eine Datei, bevor du sie änderst; für kleine Änderungen nutze edit_file.
-GitHub: Du hast Zugriff auf dein eigenes Repository ${HS.repo} (Branch ${HS.branch}). Dort liegt dein Quellcode: Oberfläche in src/Nuro/wwwroot/index.html, Windows-Host (C#) in src/Nuro/*.cs. Jeder Commit auf ${HS.branch} baut automatisch eine neue Nuro.exe über GitHub Actions; prüfe den Build danach mit gh_actions. Ändere eigenen Code nur gezielt und lies die Datei vorher vollständig.${HS.hasToken ? '' : ' Hinweis: Es ist noch kein GitHub-Token hinterlegt.'}
+Du hast Werkzeuge und arbeitest selbstständig: Plane kurz, rufe Werkzeuge auf, prüfe die Ergebnisse und mach weiter, bis die Aufgabe erledigt ist. Erfinde keine Dateiinhalte – lies sie.
+
+## Zwei getrennte Welten: LOKAL und GITHUB
+1. LOKAL = Dateien auf dem PC des Nutzers. Werkzeuge: list_dir, read_file, write_file, edit_file, search_files, run_command … Immer vollständige Windows-Pfade (z. B. C:\\Projekte\\x.cs). Zugriff nur in: ${folders}.
+2. GITHUB = dein Repository ${HS.repo}. Werkzeuge: gh_*. Pfade relativ zur Repo-Wurzel mit „/“ (z. B. src/Nuro/Tools.cs) – niemals Laufwerksbuchstaben oder „\\“.
+- Ein lokaler Pfad existiert auf GitHub NICHT, und GitHub-Pfade existieren nicht auf dem PC. Verwechsle das nie.
+- Code, der ins Repository kommt, darf keine Pfade aus den lokalen Ordnern des Nutzers enthalten (der Build läuft auf einem fremden Rechner). Für Laufzeitpfade Environment.SpecialFolder o. Ä. verwenden.
+- Wenn du lokale Dateien ins Repo übernehmen sollst: lokal mit read_file lesen, dann mit gh_write/gh_commit unter einem Repo-Pfad hochladen.
+
+## Sauber auf GitHub arbeiten (Pflichtablauf)
+Dein Quellcode: Oberfläche src/Nuro/wwwroot/index.html, Windows-Host (C#) src/Nuro/*.cs. Änderungen landen nie direkt auf main, sondern auf einem Arbeits-Branch (nuro/…).
+1. Vor einer Änderung die betroffenen Dateien mit gh_read VOLLSTÄNDIG lesen (bei langen Dateien mit start_line weiterlesen). Bei C# prüfen, ob benutzte Klassen/Methoden wirklich existieren.
+2. Bestehende Dateien mit gh_edit ändern, zusammengehörige Änderungen an mehreren Dateien mit gh_commit in EINEM Commit.
+3. Nach JEDEM Commit gh_build_wait aufrufen. Bei „BUILD FEHLGESCHLAGEN“: Fehlermeldungen lesen, betroffene Stellen mit gh_read prüfen, korrigieren, erneut gh_build_wait – bis der Build erfolgreich ist (höchstens 4 Versuche, danach dem Nutzer berichten).
+4. Erst nach erfolgreichem Build gh_merge, danach gh_build_wait für das Release auf main.
+5. Wird ein Commit von der Prüfung abgelehnt („COMMIT ABGELEHNT“), wurde nichts hochgeladen – Fehler beheben und neu versuchen.
+6. Dateien unter .github/ darfst du nicht ändern.${HS.hasToken ? '' : '\nHinweis: Es ist noch kein GitHub-Token hinterlegt.'}${HS.workBranch ? `\nAktiver Arbeits-Branch: ${HS.workBranch}` : ''}
+
+## Rückfragen
+Wenn es mehrere sinnvolle Möglichkeiten gibt oder dir eine Entscheidung fehlt, nutze ask_user mit klickbaren Optionen statt einer Textfrage. Nur fragen, wenn es wirklich nötig ist.
+
+## Gedächtnis
+Du hast ein Langzeitgedächtnis (unten). Nutze es für neue Aufgaben. Speichere mit memory_save neue, dauerhaft nützliche Fakten (Projekte, Vorlieben, Entscheidungen, Arbeitsweisen) – keine Passwörter, Tokens oder Kleinigkeiten. Überholtes mit replaces_id ersetzen. Für frühere Gespräche: chat_search und chat_read.
+
 Fasse am Ende knapp zusammen, was du getan hast.`;
 }
 
@@ -461,6 +594,7 @@ async function checkOllama(){
     const sel = $('#model'); sel.innerHTML = '';
     if (!names.length){ sel.innerHTML = '<option value="">(keine Modelle)</option>'; }
     names.forEach(n => sel.add(new Option(n, n)));
+    sel.add(new Option('＋ Modelle verwalten / herunterladen …', '__manage__'));
     if (!names.includes(S.model)) S.model = names[0] || '';
     sel.value = S.model; saveS();
     let ver = ''; try { ver = (await (await fetch(base() + '/api/version')).json()).version; } catch {}
@@ -554,12 +688,31 @@ function msgHTML(m, idx, isLast){
     return `<div class="msg user" data-i="${idx}">${att}<div class="bubble">${esc(m.content)}</div>
       <div class="acts"><button class="ib" data-act="copy" title="Kopieren">⧉</button><button class="ib" data-act="edit" title="Bearbeiten">✎</button></div></div>`;
   }
+  if (m.role === 'tool' && m.tool_name === 'ask_user'){
+    const a = m.args || {}, opts = Array.isArray(a.options) ? a.options : [];
+    if (m.waiting){
+      const multi = a.multiple === true || a.multiple === 'true';
+      return `<div class="msg tool" data-i="${idx}"><div class="askcard"><div class="q">❓ ${esc(a.question || 'Frage')}</div>
+        <div class="opts">${opts.map((o, k) => multi ? `<label class="opt chk"><input type="checkbox" value="${k}"> ${esc(o)}</label>` : `<button class="opt" data-ask-opt="${k}">${esc(o)}</button>`).join('')}</div>
+        ${multi ? '<button class="btn pri" data-ask-multi>Auswahl senden</button>' : ''}
+        <div class="own"><input type="text" data-ask-own placeholder="Eigene Antwort …"><button class="btn" data-ask-send>Senden</button></div></div></div>`;
+    }
+    return `<div class="msg tool" data-i="${idx}"><div class="askcard done"><div class="q">❓ ${esc(a.question || 'Frage')}</div>
+      <div class="ans">${m.answer == null ? '<span class="small">keine Antwort</span>' : '↳ ' + esc(m.answer)}</div></div></div>`;
+  }
+  if (m.role === 'tool' && m.tool_name === 'run_command' && m.waiting){
+    const a = m.args || {};
+    return `<div class="msg tool" data-i="${idx}"><div class="askcard warn"><div class="q">⚠ Nuro möchte einen Befehl auf deinem PC ausführen</div>
+      <pre>${esc(a.command || '')}</pre><div class="small">Ordner: ${esc(a.working_directory || '?')} · Zeitlimit ${esc(a.timeout_seconds || 120)} s</div>
+      <div class="opts"><button class="btn pri" data-ask-val="__run__">▶ Ausführen</button><button class="btn" data-ask-val="__deny__">Ablehnen</button></div>
+      <div class="own"><input type="text" data-ask-own placeholder="Oder stattdessen etwas sagen …"><button class="btn" data-ask-send>Senden</button></div></div></div>`;
+  }
   if (m.role === 'tool'){
     const a = m.args || {};
-    const main = a.path || a.from || a.title || (a.number ? '#' + a.number : '') || '';
+    const main = a.path || a.from || a.command || a.title || a.query || a.url || a.text || (a.number ? '#' + a.number : '') || '';
     const st = m.running ? '<span class="st"><span class="spin"></span></span>' : m.ok ? '<span class="st ok">✓</span>' : '<span class="st bad">✗</span>';
     const res = (m.content || '').length > 6000 ? m.content.slice(0, 6000) + '\n… (gekürzt angezeigt)' : (m.content || '');
-    return `<div class="msg tool" data-i="${idx}"><details class="toolcard"><summary>🔧 <b>${esc(TOOL_LABEL[m.tool_name] || m.tool_name)}</b><span class="arg">${esc(main)}</span>${st}</summary>
+    return `<div class="msg tool" data-i="${idx}"><details class="toolcard"><summary>${toolPlace(m.tool_name) === 'gh' ? '<span class="place gh">GitHub</span>' : toolPlace(m.tool_name) === 'pc' ? '<span class="place pc">PC</span>' : '🔧'} <b>${esc(TOOL_LABEL[m.tool_name] || m.tool_name)}</b><span class="arg">${esc(main)}</span>${st}</summary>
       <div class="tb"><div class="lbl">Eingabe</div><pre>${esc(JSON.stringify(a, null, 2))}</pre>${m.running ? '' : `<div class="lbl">Ergebnis</div><pre>${esc(res)}</pre>`}</div></details></div>`;
   }
   const streaming = isLast && abortCtl;
@@ -623,6 +776,29 @@ $('#msgs').addEventListener('click', async e => {
     };
   }
 });
+$('#msgs').addEventListener('click', e => {
+  if (!pendingAsk) return;
+  const card = e.target.closest('.askcard'); if (!card) return;
+  const opts = (pendingAsk.msg.args || {}).options || [];
+  const o = e.target.closest('[data-ask-opt]');
+  if (o) return answerPending(opts[+o.dataset.askOpt]);
+  const v = e.target.closest('[data-ask-val]');
+  if (v) return answerPending(v.dataset.askVal);
+  if (e.target.closest('[data-ask-multi]')){
+    const sel = [...card.querySelectorAll('input[type=checkbox]:checked')].map(x => opts[+x.value]);
+    const own = card.querySelector('[data-ask-own]').value.trim();
+    if (own) sel.push(own);
+    if (!sel.length) return toast('Bitte etwas auswählen oder eine eigene Antwort eingeben');
+    return answerPending(sel.join('; '));
+  }
+  if (e.target.closest('[data-ask-send]')){
+    const own = card.querySelector('[data-ask-own]').value.trim();
+    if (own) answerPending(own);
+  }
+});
+$('#msgs').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('[data-ask-own]') && e.target.value.trim() && pendingAsk){ e.preventDefault(); answerPending(e.target.value.trim()); }
+});
 $('#lightbox').onclick = () => $('#lightbox').style.display = 'none';
 
 /* ---------- Senden & Generieren ---------- */
@@ -640,8 +816,9 @@ function toApi(m){
   return o;
 }
 async function send(){
-  if (abortCtl){ abortCtl.abort(); return; }
   const text = $('#input').value.trim();
+  if (pendingAsk && text){ $('#input').value = ''; autosize(); answerPending(text); return; }
+  if (abortCtl){ stopAll(); return; }
   if (!text && !pending.length) return;
   if (!S.model) return toast('Kein Modell verfügbar – läuft Ollama?');
   const images = pending.filter(p => p.kind === 'image'), files = pending.filter(p => p.kind === 'file');
@@ -654,10 +831,165 @@ async function send(){
   await saveChat(cur); render(); toBottom();
   generate();
 }
+/* ---------- Werkzeuge ausführen (Rückfragen, Freigaben, Vorabprüfung) ---------- */
+let pendingAsk = null;   // {msg, resolve}
+function waitForUser(t){
+  return new Promise(resolve => {
+    pendingAsk = {msg:t, resolve};
+    t.waiting = true;
+    render(); toBottom();
+    $('#input').placeholder = 'Eigene Antwort eingeben …';
+    setTimeout(() => document.querySelector('.askcard [data-ask-own]')?.focus(), 50);
+  });
+}
+function answerPending(value){
+  if (!pendingAsk) return;
+  const p = pendingAsk; pendingAsk = null;
+  p.msg.waiting = false; p.msg.answer = value;
+  $('#input').placeholder = 'Schreib eine Nachricht …';
+  p.resolve(value);
+}
+function stopAll(){ if (abortCtl) abortCtl.abort(); if (pendingAsk) answerPending(null); }
+
+function checkHtml(html){
+  if (!/<\/html>\s*$/i.test(html)) return 'Die Datei endet nicht mit </html> – sie ist vermutlich abgeschnitten.';
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  for (const [i, m] of blocks.entries()){
+    try { new Function(m[1]); }
+    catch (e) { return `JavaScript-Syntaxfehler im Script-Block ${i + 1} (ab Zeile ${html.slice(0, m.index).split('\n').length}): ${e.message}`; }
+  }
+  return null;
+}
+async function precheck(name, args){
+  const files = [];
+  if (name === 'gh_write') files.push({path:args.path, content:args.content});
+  if (name === 'gh_commit') (Array.isArray(args.files) ? args.files : []).forEach(f => files.push(f));
+  if (name === 'gh_edit' && /\.(html?|js)$/i.test(args.path || '')){
+    const r = await host('/api/gh-preview-edit', {path:args.path, old_text:args.old_text, new_text:args.new_text});
+    if (r.ok && r.content != null) files.push({path:args.path, content:r.content});
+  }
+  for (const f of files){
+    if (!f || !f.path) continue;
+    const c = String(f.content ?? '');
+    let err = null;
+    if (/\.html?$/i.test(f.path)) err = checkHtml(c);
+    else if (/\.js$/i.test(f.path)){ try { new Function(c); } catch (e) { err = 'JavaScript-Syntaxfehler: ' + e.message; } }
+    if (err) return `COMMIT ABGELEHNT (Vorabprüfung in Nuro, nichts wurde hochgeladen): ${f.path}: ${err}`;
+  }
+  return null;
+}
+function chatSearch(q, current){
+  const words = tok(q);
+  if (!words.length) return 'Bitte Suchbegriffe angeben.';
+  const hits = [];
+  for (const c of chats){
+    if (c === current) continue;
+    let score = 0, snippet = '';
+    const title = c.title.toLowerCase();
+    words.forEach(w => { if (title.includes(w)) score += 3; });
+    for (const m of c.messages){
+      if ((m.role !== 'user' && m.role !== 'assistant') || !m.content) continue;
+      const tl = m.content.toLowerCase();
+      const found = words.filter(w => tl.includes(w));
+      if (!found.length) continue;
+      score += found.length;
+      if (!snippet){ const i = tl.indexOf(found[0]); snippet = m.content.slice(Math.max(0, i - 80), i + 180).replace(/\s+/g, ' '); }
+    }
+    if (score) hits.push({c, score, snippet});
+  }
+  hits.sort((a, b) => b.score - a.score || b.c.updated - a.c.updated);
+  if (!hits.length) return 'Keine passenden früheren Chats gefunden.';
+  return hits.slice(0, 10).map(x => `[${x.c.id}] „${x.c.title}“ (${new Date(x.c.updated).toLocaleDateString('de-DE')})${x.snippet ? `: …${x.snippet}…` : ''}`).join('\n');
+}
+function chatRead(id){
+  const c = chats.find(x => x.id === String(id || '').replace(/[\[\]]/g, '').trim());
+  if (!c) throw new Error('Chat nicht gefunden. Verwende eine ID aus chat_search.');
+  let out = `Chat „${c.title}“ vom ${new Date(c.created || c.updated).toLocaleString('de-DE')}\n\n`;
+  for (const m of c.messages){
+    if (m.role === 'user') out += `Nutzer: ${m.content}\n\n`;
+    else if (m.role === 'assistant' && m.content) out += `Nuro: ${m.content}\n\n`;
+    else if (m.role === 'tool') out += `(Werkzeug ${m.tool_name}${m.ok ? ' ✓' : ' ✗'})\n`;
+  }
+  return out.length > 14000 ? out.slice(0, 5000) + '\n… (Mitte ausgelassen) …\n' + out.slice(-9000) : out;
+}
+async function execTool(name, args, t, chat){
+  if (name === 'ask_user'){
+    let opts = Array.isArray(args.options) ? args.options : String(args.options || '').split(/\n|;|\|/);
+    args.options = opts.map(o => typeof o === 'string' ? o.trim() : (o?.label || o?.text || JSON.stringify(o))).filter(Boolean).slice(0, 8);
+    const ans = await waitForUser(t);
+    if (ans == null) throw new DOMException('Abgebrochen', 'AbortError');
+    return {ok:true, result:'Antwort des Nutzers: ' + ans};
+  }
+  if (name === 'chat_search') return {ok:true, result:chatSearch(args.query, chat)};
+  if (name === 'chat_read') return {ok:true, result:chatRead(args.chat_id)};
+  if (name === 'run_command'){
+    t.approval = true;
+    const ans = await waitForUser(t);
+    if (ans == null) throw new DOMException('Abgebrochen', 'AbortError');
+    if (ans === '__deny__') return {ok:true, result:'Der Nutzer hat den Befehl abgelehnt. Führe ihn nicht aus und frag ggf., wie es weitergehen soll.'};
+    if (ans !== '__run__') return {ok:true, result:'Der Nutzer hat den Befehl nicht ausgeführt und schreibt stattdessen: ' + ans};
+  }
+  const pre = await precheck(name, args);
+  if (pre) return {ok:false, error:pre};
+  return host('/api/tool', {name, args});
+}
+
+/* ---------- Automatisch merken ---------- */
+async function autoRemember(chat){
+  try {
+    let u = chat.messages.length - 1;
+    while (u >= 0 && chat.messages[u].role !== 'user') u--;
+    if (u < 0) return;
+    const userMsg = chat.messages[u].content || '';
+    const finalA = chat.messages.slice(u).reverse().find(m => m.role === 'assistant' && m.content);
+    if (userMsg.trim().length < 12) return;
+    await loadMemory();
+    const known = MEM.slice(-80).map(m => `[${m.id}] ${m.text}`).join('\n') || '(noch nichts)';
+    const prompt = `Du pflegst das Langzeitgedächtnis des Assistenten Nuro.
+
+Bereits bekannt:
+${known}
+
+Neuer Gesprächsabschnitt:
+Nutzer: ${userMsg.slice(0, 3000)}
+Nuro: ${(finalA ? finalA.content : '').slice(0, 2000)}
+
+Extrahiere NUR neue, dauerhaft nützliche Fakten über den Nutzer, seine Projekte, Vorlieben, Entscheidungen oder Arbeitsweisen, die für künftige Aufgaben wichtig sind. Nichts Vorübergehendes, keine Vermutungen, nichts schon Bekanntes, keine Passwörter, Tokens oder Zugangsdaten. Jede Erinnerung ist ein kurzer, eigenständiger Satz auf Deutsch. Ist eine bekannte Erinnerung überholt, ersetze sie über ihre ID.
+Antworte ausschließlich mit JSON in dieser Form:
+{"neu":[{"text":"...","kategorie":"person|projekt|vorliebe|wissen|sonstiges"}],"ersetzen":[{"id":"...","text":"..."}]}
+Wenn es nichts Neues gibt: {"neu":[],"ersetzen":[]}`;
+    const body = {model:S.model, stream:false, format:'json', keep_alive: S.keep === '-1' ? -1 : S.keep,
+      options:{temperature:0.1, num_ctx:Math.min(+S.ctx, 8192)}, messages:[{role:'user', content:prompt}]};
+    if (caps.includes('thinking')) body.think = false;
+    const r = await fetch(base() + '/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const j = await r.json();
+    let data; try { data = JSON.parse(j.message?.content || '{}'); } catch { return; }
+    const saved = [];
+    for (const n of (Array.isArray(data.neu) ? data.neu : []).slice(0, 5)){
+      if (n && typeof n.text === 'string' && n.text.trim().length > 6){
+        const res = await host('/api/memory', {action:'save', text:n.text.trim(), category:n.kategorie || n.category || 'sonstiges'});
+        if (res.ok && /^Gemerkt/.test(res.message || '')) saved.push(n.text.trim());
+      }
+    }
+    for (const e of (Array.isArray(data.ersetzen) ? data.ersetzen : []).slice(0, 5)){
+      if (e && e.id && typeof e.text === 'string' && MEM.some(m => m.id === e.id)){
+        const res = await host('/api/memory', {action:'save', text:e.text.trim(), replacesId:e.id});
+        if (res.ok) saved.push(e.text.trim());
+      }
+    }
+    if (saved.length){ await loadMemory(); toast(`🧠 Gemerkt: ${saved[0].slice(0, 80)}${saved.length > 1 ? ` (+${saved.length - 1})` : ''}`); if ($('#memModal').classList.contains('open')) renderMem(); }
+  } catch {}
+}
+
 function buildMessages(chat, useTools){
   const messages = [];
   let sys = S.system.trim();
   if (useTools) sys = toolSystemPrompt() + (sys ? '\n\nAnweisungen des Nutzers:\n' + sys : '');
+  if (NURO){
+    const lastUser = [...chat.messages].reverse().find(m => m.role === 'user');
+    const mb = memoryBlock(lastUser ? lastUser.content : '');
+    if (mb) sys = (sys ? sys + '\n\n' : (useTools ? '' : 'Du bist Nuro, ein lokaler KI-Assistent.\n\n')) + mb;
+  }
   if (S.date){ const d = new Date(); sys = `Aktuelles Datum: ${d.toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}, ${d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})} Uhr.` + (sys ? '\n\n' + sys : ''); }
   if (sys) messages.push({role:'system', content:sys});
   for (const m of chat.messages){
@@ -672,7 +1004,7 @@ function buildMessages(chat, useTools){
 }
 async function generate(){
   const chat = cur;
-  if (NURO) await refreshHost();
+  if (NURO){ await refreshHost(); await loadMemory(); }
   const useTools = toolsOn();
   const maxSteps = Math.max(1, Math.min(100, parseInt(S.maxSteps) || 25));
   abortCtl = new AbortController(); setBusy(true);
@@ -708,9 +1040,11 @@ async function generate(){
         chat.messages.push(t);
         if (cur === chat){ const stick = nearBottom(); render(); if (stick) toBottom(); }
         try {
-          const r = await host('/api/tool', {name, args});
+          const r = await execTool(name, args, t, chat);
           t.ok = !!r.ok; t.content = r.ok ? String(r.result ?? '') : 'FEHLER: ' + r.error;
+          if (r.ok && /^(COMMIT ABGELEHNT|MERGE ABGELEHNT|✗ BUILD FEHLGESCHLAGEN)/.test(t.content)) t.ok = false;
         } catch (e) { t.ok = false; t.content = 'FEHLER: ' + e.message; }
+        if (name.startsWith('memory_')) loadMemory();
         t.running = false;
         if (cur === chat){ const stick = nearBottom(); render(); if (stick) toBottom(); }
         if (abortCtl.signal.aborted) throw new DOMException('Abgebrochen', 'AbortError');
@@ -729,11 +1063,16 @@ async function generate(){
     else last.error = /Failed to fetch|NetworkError/.test(e.message) ? 'Ollama ist nicht erreichbar. Läuft Ollama?' : e.message;
     a = last;
   } finally {
-    chat.messages.forEach(m => { if (m.role === 'tool' && m.running){ m.running = false; m.ok = false; m.content = m.content || 'Abgebrochen'; } });
+    chat.messages.forEach(m => {
+      if (m.role === 'tool' && m.running){ m.running = false; m.ok = false; m.content = m.content || 'Abgebrochen'; }
+      if (m.role === 'tool' && m.waiting){ m.waiting = false; m.answer = m.answer ?? null; }
+    });
+    if (pendingAsk) answerPending(null);
     abortCtl = null; setBusy(false);
     await saveChat(chat);
     if (cur === chat) render();
     if (!chat.titled && a && !a.error) autoTitle(chat);
+    if (NURO && S.autoMemory && a && !a.error && !a.stopped) autoRemember(chat);
   }
 }
 function setBusy(b){ const s = $('#send'); s.textContent = b ? '■' : '↑'; s.title = b ? 'Stoppen' : 'Senden (Enter)'; }
@@ -798,16 +1137,152 @@ $('#input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shift
 $('#send').onclick = send;
 $('#newChat').onclick = () => { if (abortCtl) return toast('Bitte erst die laufende Antwort stoppen'); newChat(); };
 $('#search').oninput = renderList;
-$('#model').onchange = async e => { S.model = e.target.value; saveS(); await loadCaps(); };
+$('#model').onchange = async e => {
+  if (e.target.value === '__manage__'){ e.target.value = S.model; openModels(); return; }
+  S.model = e.target.value; saveS(); await loadCaps();
+};
 $('#thinkSel').onchange = e => { S.think = e.target.value; saveS(); };
 $('#toolsBtn').onclick = () => { S.tools = !S.tools; saveS(); loadCaps(); toast(S.tools ? 'Werkzeuge an' : 'Werkzeuge aus'); };
 
+
+/* ---------- Gedächtnis-Fenster ---------- */
+function renderMem(){
+  const q = $('#mSearch').value.trim().toLowerCase();
+  const list = MEM.filter(m => !q || m.text.toLowerCase().includes(q) || m.category.includes(q))
+    .sort((a, b) => new Date(b.updated) - new Date(a.updated));
+  $('#memList').innerHTML = list.length ? list.map(m => `<div class="memrow"><span class="ct">${esc(m.category)}</span><span class="tx">${esc(m.text)}</span>
+      <button class="ib" data-mdel="${esc(m.id)}" title="Vergessen">✕</button></div>`).join('')
+    : `<div class="small" style="padding:10px 4px">${q ? 'Nichts gefunden.' : 'Noch keine Erinnerungen. Nuro merkt sich Wichtiges automatisch oder wenn du es sagst („Merk dir …“).'}</div>`;
+  $('#mCount').textContent = `${MEM.length} Erinnerung${MEM.length === 1 ? '' : 'en'}`;
+}
+$('#openMemory').onclick = async () => { $('#mAuto').checked = S.autoMemory; await loadMemory(); renderMem(); $('#memModal').classList.add('open'); };
+$('#mClose').onclick = () => $('#memModal').classList.remove('open');
+$('#memModal').onclick = e => { if (e.target.id === 'memModal') $('#memModal').classList.remove('open'); };
+$('#mAuto').onchange = e => { S.autoMemory = e.target.checked; saveS(); };
+$('#mSearch').oninput = renderMem;
+$('#memList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-mdel]'); if (!b) return;
+  const r = await host('/api/memory', {action:'delete', id:b.dataset.mdel}); MEM = r.entries || MEM; renderMem();
+});
+async function addMem(){
+  const text = $('#mText').value.trim(); if (!text) return;
+  const r = await host('/api/memory', {action:'save', text, category:$('#mCat').value});
+  MEM = r.entries || MEM; $('#mText').value = ''; renderMem(); toast(r.ok ? r.message : r.error);
+}
+$('#mAdd').onclick = addMem;
+$('#mText').addEventListener('keydown', e => { if (e.key === 'Enter') addMem(); });
+
+/* ---------- Modell-Manager ---------- */
+// VRAM-Klassen nach gängigen Empfehlungen (Q4-Quantisierung); "Werkzeuge" laut Ollama-Bibliothek
+const SUGGEST = [
+  {name:'gemma4:12b', vram:16, note:'Bilder, Denken, Werkzeuge'},
+  {name:'gpt-oss:20b', vram:16, note:'Denken, Werkzeuge – stark beim Planen'},
+  {name:'qwen3.5:9b', vram:16, note:'schnell, Werkzeuge'},
+  {name:'gemma4:26b', vram:24, note:'Bilder, Denken, Werkzeuge'},
+  {name:'qwen3.6:27b', vram:24, note:'stark beim Programmieren mit Werkzeugen'},
+  {name:'qwen3-coder:30b', vram:24, note:'spezialisiert aufs Programmieren'},
+];
+let lastGpu = null, pullCtl = null;
+const gb = b => (b / 1e9).toFixed(1) + ' GB';
+async function openModels(){
+  $('#modelModal').classList.add('open');
+  await renderModels();
+}
+async function renderModels(){
+  let models = [];
+  try { models = (await (await fetch(base() + '/api/tags')).json()).models || []; } catch { $('#mmList').innerHTML = '<div class="err">Ollama ist nicht erreichbar.</div>'; return; }
+  const vram = lastGpu ? lastGpu.memTotalMb / 1024 : null;
+  $('#mmGpu').textContent = lastGpu ? `Grafikkarte: ${lastGpu.name} mit ${vram.toFixed(0)} GB Grafikspeicher. Modelle, die nicht ganz hineinpassen, laufen teilweise auf der CPU und deutlich langsamer.` : '';
+  $('#mmList').innerHTML = models.length ? models.sort((a, b) => a.name.localeCompare(b.name)).map(m => `<div class="mrow${m.name === S.model ? ' active' : ''}" data-m="${esc(m.name)}">
+      <span class="nm">${esc(m.name)}</span><span class="sz">${m.size ? gb(m.size) : ''}</span><span class="caps" data-caps="${esc(m.name)}"></span><span class="sp"></span>
+      ${m.name === S.model ? '<span class="small">aktiv</span>' : `<button class="btn" data-use="${esc(m.name)}">Verwenden</button>`}
+      <button class="ib" data-delm="${esc(m.name)}" title="Löschen">🗑</button></div>`).join('')
+    : '<div class="small">Noch keine Modelle installiert.</div>';
+  const names = models.map(m => m.name);
+  $('#mmSuggest').innerHTML = SUGGEST.filter(s => !names.includes(s.name)).map(s => {
+    const fit = vram == null ? '' : vram >= s.vram * 0.95 ? '<span class="fit">✓ passt</span>' : '<span class="nofit">⚠ knapp</span>';
+    return `<button data-sug="${s.name}"><b>${s.name}</b> · ${s.note} · ab ${s.vram} GB VRAM ${fit}</button>`;
+  }).join('');
+  for (const m of models){
+    fetch(base() + '/api/show', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:m.name})})
+      .then(r => r.json()).then(j => {
+        const lab = {vision:'Bilder', thinking:'Denken', tools:'Werkzeuge'};
+        const el = document.querySelector(`[data-caps="${CSS.escape(m.name)}"]`);
+        if (el) el.innerHTML = (j.capabilities || []).filter(c => lab[c]).map(c => `<span class="badge">${lab[c]}</span>`).join(' ');
+      }).catch(() => {});
+  }
+}
+$('#mmList').addEventListener('click', async e => {
+  const u = e.target.closest('[data-use]');
+  if (u){ await useModel(u.dataset.use); return; }
+  const d = e.target.closest('[data-delm]');
+  if (d){
+    if (!confirm(`Modell „${d.dataset.delm}“ von der Festplatte löschen?`)) return;
+    const r = await fetch(base() + '/api/delete', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:d.dataset.delm})});
+    toast(r.ok ? 'Gelöscht' : 'Löschen fehlgeschlagen');
+    await checkOllama(); await renderModels();
+  }
+});
+async function useModel(name){
+  await checkOllama();
+  const opt = [...$('#model').options].find(o => o.value === name || o.value === name + ':latest');
+  if (!opt) return toast('Modell nicht gefunden');
+  S.model = opt.value; saveS(); $('#model').value = S.model; await loadCaps(); await renderModels();
+  toast(`Aktiv: ${S.model}` + (caps.includes('tools') ? '' : ' (ohne Werkzeuge)'));
+}
+$('#mmSuggest').addEventListener('click', e => { const b = e.target.closest('[data-sug]'); if (b){ $('#mmName').value = b.dataset.sug; $('#mmName').focus(); } });
+$('#mmName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#mmPull').click(); });
+$('#mmPull').onclick = async () => {
+  const name = $('#mmName').value.trim().replace(/^ollama\s+(pull|run)\s+/i, '');
+  if (!name || pullCtl) return;
+  if (!/^[\w.\-/]+(:[\w.\-]+)?$/.test(name)) return toast('Ungültiger Modellname');
+  pullCtl = new AbortController();
+  $('#mmProg').style.display = ''; $('#mmBar').style.width = '0'; $('#mmPull').disabled = true;
+  const parts = {}; let lastT = Date.now(), lastDone = 0, speed = 0, ok = false;
+  try {
+    const res = await fetch(base() + '/api/pull', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:name, stream:true}), signal:pullCtl.signal});
+    if (!res.ok) throw new Error((await res.text()) || ('HTTP ' + res.status));
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for (;;){
+      const {done, value} = await reader.read(); if (done) break;
+      buf += dec.decode(value, {stream:true});
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0){
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const j = JSON.parse(line);
+        if (j.error) throw new Error(j.error);
+        if (j.digest && j.total) parts[j.digest] = {total:j.total, done:j.completed || 0};
+        const total = Object.values(parts).reduce((s, p) => s + p.total, 0), doneB = Object.values(parts).reduce((s, p) => s + p.done, 0);
+        const now = Date.now();
+        if (now - lastT > 800){ speed = (doneB - lastDone) / ((now - lastT) / 1000); lastT = now; lastDone = doneB; }
+        const pct = total ? Math.floor(doneB / total * 100) : 0;
+        $('#mmBar').style.width = (j.status === 'success' ? 100 : pct) + '%';
+        const st = {'pulling manifest':'Lade Manifest …', 'verifying sha256 digest':'Prüfe Download …', 'writing manifest':'Installiere …', 'success':'Fertig ✓'}[j.status] || (j.status || '').replace(/^pulling\s+\w+$/, 'Lade herunter');
+        $('#mmStat').textContent = total && j.status !== 'success' ? `${st} ${pct} % · ${gb(doneB)} / ${gb(total)}${speed > 0 ? ` · ${(speed / 1e6).toFixed(1)} MB/s` : ''}` : st;
+        if (j.status === 'success') ok = true;
+      }
+    }
+    if (!ok) throw new Error('Download unvollständig');
+    toast(`${name} installiert`);
+    await useModel(name);
+    $('#mmName').value = '';
+  } catch (e) {
+    $('#mmStat').textContent = e.name === 'AbortError' ? 'Abgebrochen (bereits geladene Teile bleiben erhalten und werden beim nächsten Mal fortgesetzt).' : 'Fehler: ' + e.message;
+  } finally {
+    pullCtl = null; $('#mmPull').disabled = false;
+  }
+};
+$('#mmCancel').onclick = () => { if (pullCtl) pullCtl.abort(); else $('#mmProg').style.display = 'none'; };
+$('#mmClose').onclick = () => $('#modelModal').classList.remove('open');
+$('#modelModal').onclick = e => { if (e.target.id === 'modelModal') $('#modelModal').classList.remove('open'); };
 /* ---------- Grafikkarte & Updates (nur in Nuro.exe) ---------- */
 async function pollGpu(){
   if (!NURO) return;
   try {
     const r = await host('/api/gpu');
     const g = (r.gpus || [])[0], el = $('#gpu');
+    lastGpu = g || null;
     if (!g){ el.style.display = 'none'; return; }
     el.style.display = '';
     el.textContent = `${g.name.replace(/^NVIDIA\s+(GeForce\s+)?/i, '')} · ${(g.memUsedMb / 1024).toFixed(1)}/${(g.memTotalMb / 1024).toFixed(0)} GB · ${g.utilPercent} % · ${g.tempC} °C`;
@@ -834,7 +1309,7 @@ $('#upd').onclick = async () => {
 };
 $('#toggleSide').onclick = () => { S.sideHidden = !S.sideHidden; saveS(); $('#side').classList.toggle('hidden', S.sideHidden); };
 addEventListener('keydown', e => {
-  if (e.key === 'Escape' && abortCtl) abortCtl.abort();
+  if (e.key === 'Escape' && abortCtl) stopAll();
   if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'o'){ e.preventDefault(); $('#newChat').click(); }
 });
 
@@ -933,7 +1408,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme
   $('#input').focus();
   await refreshHost();
   await checkOllama();
-  if (NURO){ pollGpu(); setInterval(pollGpu, 5000); checkUpdate(); setInterval(checkUpdate, 30 * 60000); }
+  if (NURO){ $('#openMemory').style.display = ''; loadMemory(); pollGpu(); setInterval(pollGpu, 5000); checkUpdate(); setInterval(checkUpdate, 30 * 60000); }
   setInterval(() => { if (!abortCtl) fetch(base() + '/api/version').then(() => { if ($('#dot').classList.contains('bad')) checkOllama(); }).catch(() => setStatus(false, 'Ollama nicht erreichbar')); }, 10000);
 })();
 </script>

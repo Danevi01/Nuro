@@ -1,21 +1,32 @@
 name: Nuro.exe bauen
 
+# Jeder Push wird gebaut und geprüft.
+# Arbeits-Branches (nuro/…) nur bauen – ein Release entsteht ausschließlich auf main.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - '.github/workflows/build.yml'
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Oberfläche prüfen (JavaScript-Syntax)
+        run: node build/check-ui.js
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -28,13 +39,22 @@ jobs:
       - name: Nuro.exe bauen
         run: dotnet publish src/Nuro/Nuro.csproj -c Release -o out -p:Version=${{ env.NURO_VERSION }}
 
+      - name: exe prüfen
+        shell: pwsh
+        run: |
+          $f = Get-Item out/Nuro.exe
+          if ($f.Length -lt 20MB) { Write-Error "Nuro.exe ist verdächtig klein ($($f.Length) Bytes)"; exit 1 }
+          Write-Host "Nuro.exe: $([math]::Round($f.Length / 1MB, 1)) MB"
+
       - name: Build-Ergebnis hochladen
         uses: actions/upload-artifact@v4
         with:
           name: Nuro-${{ env.NURO_VERSION }}
           path: out/Nuro.exe
+          retention-days: 14
 
       - name: Release veröffentlichen
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.NURO_VERSION }}

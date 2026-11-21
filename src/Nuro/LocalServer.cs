@@ -106,7 +106,8 @@ public sealed class LocalServer
         folders = _config.Folders,
         repo = _config.Repo,
         branch = _config.Branch,
-        hasToken = !string.IsNullOrEmpty(_config.Token)
+        hasToken = !string.IsNullOrEmpty(_config.Token),
+        workBranch = _tools.GitHub.WorkBranch
     };
 
     private async Task<object> ApiAsync(string path, JsonElement body)
@@ -158,6 +159,30 @@ public sealed class LocalServer
 
             case "/api/gpu":
                 return new { gpus = await GpuTools.QueryAsync(), models = await GpuTools.LoadedModelsAsync() };
+
+            case "/api/memory":
+            {
+                var action = body.TryGetProperty("action", out var ac) ? ac.GetString() : "list";
+                string? Get(string k) => body.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+                try
+                {
+                    string? msg = action switch
+                    {
+                        "save" => _tools.Memory.Remember(Get("text") ?? "", Get("category"), Get("replacesId")),
+                        "delete" => _tools.Memory.Forget(Get("id") ?? ""),
+                        _ => null
+                    };
+                    return new { ok = true, message = msg, entries = _tools.Memory.All() };
+                }
+                catch (Exception ex) { return new { ok = false, error = ex.Message, entries = _tools.Memory.All() }; }
+            }
+
+            case "/api/gh-preview-edit":
+            {
+                string G(string k) => body.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+                try { return new { ok = true, content = await _tools.GitHub.PreviewEditAsync(G("path"), G("old_text"), G("new_text")) }; }
+                catch (Exception ex) { return new { ok = false, error = ex.Message }; }
+            }
 
             case "/api/github-test":
                 return await _tools.GitHub.TestAsync();

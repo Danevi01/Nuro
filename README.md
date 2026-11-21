@@ -20,6 +20,7 @@ Beim ersten Start meldet Windows SmartScreen eventuell „unbekannter Herausgebe
 - **GitHub-Token:** Unter [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) einen *Fine-grained token* erstellen.
   - Repository access: *Only select repositories* → `Danevi01/Nuro`
   - Permissions: **Contents** Read and write, **Issues** Read and write, **Actions** Read-only (Metadata wird automatisch gesetzt)
+  - Mit Actions Read-only kann Nuro Build-Status und Build-Logs lesen.
 
   Den Token in Nuro eintragen und auf „Verbindung testen“ klicken. Er wird mit Windows-Verschlüsselung (DPAPI) nur für dein Benutzerkonto gespeichert.
 
@@ -35,7 +36,19 @@ Beim ersten Start meldet Windows SmartScreen eventuell „unbekannter Herausgebe
   | GitHub | Dateien auflisten, lesen, schreiben und ändern (mit direktem Commit), löschen, Commits, Issues (lesen, anlegen, kommentieren, schließen), Build-Status |
   | Grafikkarte | Auslastung, VRAM, Temperatur, Stromverbrauch, geladene Modelle |
 
+- **Gedächtnis (🧠):** Nuro merkt sich nach jeder Antwort automatisch wichtige Fakten (abschaltbar), nutzt sie bei neuen Aufgaben und kann frühere Chats durchsuchen. Alles ist im Gedächtnis-Fenster einsehbar und löschbar (`%LOCALAPPDATA%\Nuro\memory.json`).
+- **Rückfragen mit Auswahl:** Gibt es mehrere Möglichkeiten, zeigt Nuro klickbare Antworten und immer zusätzlich ein Feld für eine eigene Antwort.
+- **Befehle:** `run_command` führt Befehle in cmd.exe aus, aber erst nach deinem Klick auf „Ausführen“, und nur mit einem Arbeitsordner innerhalb der Freigaben.
+- **Modelle wechseln:** Über die Modellauswahl → „Modelle verwalten / herunterladen“ installierte Modelle wählen oder löschen und neue Modelle mit Fortschrittsanzeige herunterladen.
 - **GPU-Anzeige:** oben rechts, mit Details zum geladenen Modell beim Darüberfahren
+- **Saubere GitHub-Builds:** Nuro committet nie direkt auf `main`. Änderungen landen auf einem Arbeits-Branch (`nuro/…`). Vor jedem Commit prüft Nuro:
+  - Pfade: lokale Windows-Pfade werden abgelehnt.
+  - C#-Syntax, JSON und XML
+  - JavaScript der Oberfläche
+  - abgeschnittene Dateien
+  - Verweise auf lokale Ordner
+
+  Danach wartet Nuro auf den Build und liest bei Fehlern das Build-Log. Gemergt wird erst nach einem grünen Build. Nur `main` erzeugt Releases; Dateien unter `.github/` darf Nuro nicht ändern.
 - **Selbst-Update:** Jeder Commit auf `main` baut automatisch eine neue `Nuro.exe` (GitHub Actions → Releases). Gibt es eine neuere Version, zeigt Nuro oben den Knopf **⬆ Update** und tauscht sich auf Klick selbst aus. So kann Nuro seinen eigenen Code im Repo verbessern und danach die neue Version installieren.
 
 > **Hinweis:** Die Werkzeuge brauchen ein Modell mit Werkzeug-Unterstützung. Das Modell muss in Ollama die Fähigkeit *tools* haben; die Plakette „Werkzeuge“ neben der Modellwahl zeigt es an.
