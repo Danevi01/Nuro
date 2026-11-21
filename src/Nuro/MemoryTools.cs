@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -46,15 +47,41 @@ public sealed class MemoryTools
             var json = await File.ReadAllTextAsync(_memoryPath);
             var data = JsonSerializer.Deserialize<MemoryData>(json);
             
-            if (data != null && data.Memories.ContainsKey(key))
+            if (data != null && data.Memories.TryGetValue(key, out var content))
             {
-                return data.Memories[key];
+                return content;
             }
             return "Schlüssel nicht gefunden.";
         }
         catch (Exception ex)
         {
             return $"Fehler beim Abrufen: {ex.Message}";
+        }
+    }
+
+    public async Task<string> SearchMemoryAsync(string query)
+    {
+        try
+        {
+            if (!File.Exists(_memoryPath)) return "Speicherdatei nicht gefunden.";
+            var json = await File.ReadAllTextAsync(_memoryPath);
+            var data = JsonSerializer.Deserialize<MemoryData>(json);
+            
+            if (data == null || data.Memories == null) return "Speicher leer oder ungültig.";
+
+            var results = data.Memories
+                .Where(kvp => kvp.Key.Contains(query, StringComparison.OrdinalIgnoreCase) || 
+                               kvp.Value.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .Select(kvp => $"[{kvp.Key}]: {kvp.Value}")
+                .ToList();
+
+            if (results.Count == 0) return "Keine passenden Erinnerungen gefunden.";
+            
+            return "Gefundene Erinnerungen:\n" + string.Join("\n", results);
+        }
+        catch (Exception ex)
+        {
+            return $"Fehler bei der Suche: {ex.Message}";
         }
     }
 
@@ -68,9 +95,7 @@ public sealed class MemoryTools
             
             if (data == null) return "Speicher leer.";
             
-            var keys = new List<string>();
-            foreach (var key in data.Memories.Keys) keys.Add(key);
-            
+            var keys = data.Memories.Keys.ToList();
             return "Verfügbare Schlüssel: " + string.Join(", ", keys);
         }
         catch (Exception ex)
