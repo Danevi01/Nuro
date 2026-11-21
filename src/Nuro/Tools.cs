@@ -9,10 +9,11 @@ public sealed class Tools
     public GitHubTools GitHub { get; }
     public const int MaxChars = 40000;
 
-    public Tools(Config c)
+    public CommandTools(Config c)
     {
         Files = new FileTools(c);
         GitHub = new GitHubTools(c);
+        Commands = new CommandTools();
     }
 
     public Task<string> RunAsync(string name, JsonElement a) => name switch
@@ -45,6 +46,7 @@ public sealed class Tools
 
         // System
         "gpu_status" => GpuTools.StatusTextAsync(),
+        "execute_command" => Commands.ExecuteAsync(S(a, "command"), S(a, "args"), S(a, "workingDirectory")),
 
         _ => throw new InvalidOperationException($"Unbekanntes Werkzeug: {name}")
     };
