@@ -14,6 +14,12 @@ public sealed class MemoryTools
     {
         try
         {
+            if (!File.Exists(_memoryPath))
+            {
+                var initial = new { LastUpdate = DateTime.UtcNow.ToString("o"), Memories = new Dictionary<string, string>() };
+                await File.WriteAllTextAsync(_memoryPath, JsonSerializer.Serialize(initial, new JsonSerializerOptions { WriteIndented = true }));
+            }
+
             var json = await File.ReadAllTextAsync(_memoryPath);
             var data = JsonSerializer.Deserialize<MemoryData>(json);
             
@@ -36,6 +42,7 @@ public sealed class MemoryTools
     {
         try
         {
+            if (!File.Exists(_memoryPath)) return "Speicherdatei nicht gefunden.";
             var json = await File.ReadAllTextAsync(_memoryPath);
             var data = JsonSerializer.Deserialize<MemoryData>(json);
             
@@ -55,6 +62,7 @@ public sealed class MemoryTools
     {
         try
         {
+            if (!File.Exists(_memoryPath)) return "Speicherdatei nicht gefunden.";
             var json = await File.ReadAllTextAsync(_memoryPath);
             var data = JsonSerializer.Deserialize<MemoryData>(json);
             
