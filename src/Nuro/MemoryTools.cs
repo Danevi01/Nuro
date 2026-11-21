@@ -1,40 +1,79 @@
 using System;
-using System.Text.Json;
+using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Nuro;
 
 public sealed class MemoryTools
 {
-    // Der Pfad wird in der Config definiert, standardmäßig D:\Local_KI\Memory
-    private string _memoryPath = @"D:\Local_KI\Memory\memory_snapshot.json";
+    private readonly string _memoryPath = @"D:\Local_KI\Memory\memory.json";
 
-    public async Task<string> SaveMemoryAsync(string project, string status, string[] completed, string[] active, string notes)
+    public async Task<string> SaveMemoryAsync(string key, string content)
     {
-        var snapshot = new
+        try
         {
-            last_update = DateTime.Now.ToString("o"),
-            current_project = project,
-            roadmap_status = status,
-            completed_tasks = completed,
-            active_tasks = active,
-            context_notes = notes
-        };
+            var json = await File.ReadAllTextAsync(_memoryPath);
+            var data = JsonSerializer.Deserialize<MemoryData>(json);
+            
+            if (data == null) data = new MemoryData();
+            data.Memories[key] = content;
+            data.LastUpdate = DateTime.UtcNow.ToString("o");
 
-        string json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
-        
-        // Sicherstellen, dass der Ordner existiert
-        string dir = Path.GetDirectoryName(_memoryPath);
-        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-        
-        File.WriteAllText(_memoryPath, json);
-        return "Gedächtnis erfolgreich aktualisiert.";
+            var updatedJson = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(_memoryPath, updatedJson);
+            
+            return $"Erfolgreich gespeichert: {key}";
+        }
+        catch (Exception ex)
+        {
+            return $"Fehler beim Speichern: {ex.Message}";
+        }
     }
 
-    public async Task<string> ReadMemoryAsync()
+    public async Task<string> GetMemoryAsync(string key)
     {
-        if (!File.Exists(_memoryPath)) return "Kein Gedächtnis gefunden.";
-        return File.ReadAllText(_memoryPath);
+        try
+        {
+            var json = await File.ReadAllTextAsync(_memoryPath);
+            var data = JsonSerializer.Deserialize<MemoryData>(json);
+            
+            if (data != null && data.Memories.ContainsKey(key))
+            {
+                return data.Memories[key];
+            }
+            return "Schlüssel nicht gefunden.";
+        }
+        catch (Exception ex)
+        {
+            return $"Fehler beim Abrufen: {ex.Message}";
+        }
+    }
+
+    public async Task<string> ListMemoriesAsync()
+    {
+        try
+        {
+            var json = await File.ReadAllTextAsync(_memoryPath);
+            var data = JsonSerializer.Deserialize<MemoryData>(json);
+            
+            if (data == null) return "Speicher leer.";
+            
+            var keys = new List<string>();
+            foreach (var key in data.Memories.Keys) keys.Add(key);
+            
+            return "Verfügbare Schlüssel: " + string.Join(", ", keys);
+        }
+        catch (Exception ex)
+        {
+            return $"Fehler beim Auflisten: {ex.Message}";
+        }
+    }
+
+    private class MemoryData
+    {
+        public string LastUpdate { get; set; }
+        public Dictionary<string, string> Memories { get; set; } = new();
     }
 }
