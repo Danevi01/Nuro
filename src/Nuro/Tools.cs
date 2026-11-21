@@ -8,7 +8,10 @@ namespace Nuro;
 /// </summary>
 public sealed class Tools
 {
-    public FileTools Files { get; }
+    public FileTools Files { get; } 
+    public GitHubTools GitHub { get; } 
+    public MemoryTools Memory { get; } 
+    public CommandTools Commands { get; }
     public GitHubTools GitHub { get; }
     public MemoryTools Memory { get; }
     public CommandTools Commands { get; }
