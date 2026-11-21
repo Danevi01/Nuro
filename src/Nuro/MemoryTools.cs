@@ -9,8 +9,14 @@ namespace Nuro;
 
 public sealed class MemoryTools
 {
-    private readonly string _memoryPath = @"D:\Local_KI\Memory\memory.json";
+    private readonly string _memoryPath;
 
+    public MemoryTools(Config c)
+    {
+        _memoryPath = !string.IsNullOrWhiteSpace(c.MemoryPath) 
+            ? c.MemoryPath 
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nuro", "memory.json");
+    }
     public async Task<string> SaveMemoryAsync(string key, string content)
     {
         try
