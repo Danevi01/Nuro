@@ -141,6 +141,31 @@ details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-
 .editbox textarea{width:100%;min-height:80px;background:var(--surf);border:1px solid var(--accent);border-radius:12px;padding:10px;outline:none;resize:vertical}
 .editbox{width:85%}
 .editbox .foot{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+/* Werkzeuge */
+.msg.tool{margin:6px 0}
+details.toolcard{border:1px solid var(--line);border-radius:10px;background:var(--surf);font-size:13.5px}
+details.toolcard summary{cursor:pointer;padding:6px 12px;display:flex;align-items:center;gap:8px;list-style:none;user-select:none}
+details.toolcard summary::-webkit-details-marker{display:none}
+details.toolcard summary .arg{color:var(--muted);font-family:Consolas,monospace;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+details.toolcard .st{margin-left:auto;flex:none}
+details.toolcard .st.ok{color:#5cb85c}details.toolcard .st.bad{color:var(--err)}
+details.toolcard .tb{padding:4px 12px 10px;border-top:1px solid var(--line)}
+details.toolcard .lbl{color:var(--muted);font-size:12px;margin:8px 0 3px}
+details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8px 10px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 Consolas,monospace}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toolsBtn{border:1px solid var(--line);background:transparent;border-radius:20px;padding:2px 10px;font-size:12px;color:var(--muted)}
+#toolsBtn.on{border-color:var(--accent);color:var(--accent)}
+#toolsBtn:disabled{opacity:.45;cursor:default}
+#gpu{cursor:default;white-space:nowrap}
+#upd{display:none;border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:20px;padding:2px 10px;font-size:12px}
+.sec{border-top:1px solid var(--line);margin-top:18px;padding-top:12px}
+.sec h3{margin:0 0 6px;font-size:15px}
+.folders{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.folders .f{display:flex;align-items:center;gap:6px;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13.5px}
+.folders .f span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.small{font-size:12.5px;color:var(--muted)}
+.ok-t{color:#5cb85c}.bad-t{color:var(--err)}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
 </style>
 </head>
@@ -160,7 +185,7 @@ details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-
       <button class="ib" id="toggleSide" title="Seitenleiste">☰</button>
       <select id="model" title="Modell"></select>
       <span id="caps"></span>
-      <div id="status"><span class="dot" id="dot"></span><span id="statusText">Verbinde …</span></div>
+      <div id="status"><button id="upd"></button><span class="badge" id="gpu" style="display:none"></span><span class="dot" id="dot"></span><span id="statusText">Verbinde …</span></div>
       <button class="ib" id="exportChat" title="Chat als Markdown exportieren">⇩</button>
     </div>
     <div id="scroll"><div id="msgs"></div></div>
@@ -174,6 +199,7 @@ details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-
         <textarea id="input" rows="1" placeholder="Schreib eine Nachricht …"></textarea>
         <div class="crow">
           <button class="ib" id="attach" title="Datei oder Bild anhängen">📎</button>
+          <button id="toolsBtn" style="display:none" title="Werkzeuge: Dateien, GitHub, Grafikkarte">🔧 Werkzeuge</button>
           <select id="thinkSel" class="badge" title="Denkmodus" style="display:none">
             <option value="auto">Denken: Auto</option><option value="on">Denken: An</option><option value="off">Denken: Aus</option>
           </select>
@@ -208,6 +234,32 @@ details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-
         <select id="sKeep"><option value="5m">5 Minuten</option><option value="30m">30 Minuten</option><option value="2h">2 Stunden</option><option value="-1">Immer</option></select></div>
     </div>
     <div class="fld"><label><input type="checkbox" id="sDate"> Aktuelles Datum und Uhrzeit mitschicken</label></div>
+    <div id="hostSettings" style="display:none">
+      <div class="sec">
+        <h3>Werkzeuge</h3>
+        <div class="row2">
+          <div class="fld"><label><input type="checkbox" id="sTools"> Werkzeuge verwenden (selbstständiges Arbeiten)</label></div>
+          <div class="fld"><label>Max. Schritte pro Antwort</label><input type="text" id="sSteps" style="width:90px"></div>
+        </div>
+      </div>
+      <div class="sec">
+        <h3>Freigegebene Ordner</h3>
+        <div class="small">Hier darf Nuro ohne Rückfrage lesen, schreiben, verschieben und löschen.</div>
+        <div class="folders" id="folderList"></div>
+        <button class="btn" id="addFolder">＋ Ordner freigeben</button>
+      </div>
+      <div class="sec">
+        <h3>GitHub</h3>
+        <div class="row2">
+          <div class="fld"><label>Repository</label><input type="text" id="sRepo"></div>
+          <div class="fld" style="flex:.5"><label>Branch</label><input type="text" id="sBranch"></div>
+        </div>
+        <div class="fld"><label>Token (Fine-grained, Rechte: Contents, Issues, Actions) – <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" style="color:var(--accent)">Token erstellen</a></label>
+          <input type="text" id="sToken" autocomplete="off" style="-webkit-text-security:disc"></div>
+        <button class="btn" id="ghTest">Verbindung testen</button> <span id="ghRes" class="small"></span>
+      </div>
+      <div class="sec small" id="verInfo"></div>
+    </div>
     <div class="foot">
       <button class="btn" id="exportAll">Alle Chats sichern</button>
       <button class="btn" id="importAll">Sicherung laden</button>
@@ -223,12 +275,65 @@ details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
-const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:8192, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false};
+const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:16384, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false, tools:true, maxSteps:25};
 let S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('nuro_settings') || '{}'));
 const saveS = () => localStorage.setItem('nuro_settings', JSON.stringify(S));
 const base = () => S.url.replace(/\/+$/, '');
 
 let chats = [], cur = null, pending = [], abortCtl = null, caps = [];
+
+/* ---------- Host (Nuro.exe) ---------- */
+const NURO = window.NURO || null;           // nur vorhanden, wenn Nuro.exe die Seite ausliefert
+let HS = {folders:[], repo:'', branch:'main', hasToken:false, version:''};
+async function host(path, body){
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json', 'X-Nuro-Token':NURO.token}, body:JSON.stringify(body || {})});
+  if (!r.ok && r.status !== 500) throw new Error('Host-Fehler ' + r.status);
+  return r.json();
+}
+async function refreshHost(){ if (NURO){ try { HS = await host('/api/state'); } catch {} } }
+const toolsOn = () => !!NURO && S.tools && caps.includes('tools');
+
+const fn = (name, description, props = {}, required = []) =>
+  ({type:'function', function:{name, description, parameters:{type:'object', properties:props, required}}});
+const str = d => ({type:'string', description:d}), int = d => ({type:'integer', description:d}), bool = d => ({type:'boolean', description:d});
+const TOOLS = [
+  fn('list_allowed_folders', 'Zeigt die Ordner, auf die du Zugriff hast.'),
+  fn('list_dir', 'Listet Dateien und Unterordner eines Ordners.', {path:str('Vollständiger Ordnerpfad'), recursive:bool('Auch Unterordner auflisten')}, ['path']),
+  fn('read_file', 'Liest eine Textdatei (zeilenweise, max. 400 Zeilen pro Aufruf).', {path:str('Vollständiger Dateipfad'), start_line:int('Erste Zeile (ab 1)'), max_lines:int('Anzahl Zeilen')}, ['path']),
+  fn('write_file', 'Erstellt oder überschreibt eine Textdatei (legt fehlende Ordner an).', {path:str('Vollständiger Dateipfad'), content:str('Kompletter neuer Inhalt'), append:bool('Anhängen statt überschreiben')}, ['path', 'content']),
+  fn('edit_file', 'Ersetzt in einer Datei einen exakt vorkommenden Textabschnitt (muss genau einmal vorkommen).', {path:str('Vollständiger Dateipfad'), old_text:str('Exakter alter Text'), new_text:str('Neuer Text')}, ['path', 'old_text', 'new_text']),
+  fn('create_folder', 'Legt einen Ordner an.', {path:str('Vollständiger Ordnerpfad')}, ['path']),
+  fn('delete_path', 'Löscht eine Datei oder einen Ordner samt Inhalt.', {path:str('Vollständiger Pfad')}, ['path']),
+  fn('move_path', 'Verschiebt oder benennt eine Datei/einen Ordner um.', {from:str('Quellpfad'), to:str('Zielpfad')}, ['from', 'to']),
+  fn('search_files', 'Sucht Dateien nach Namensmuster und optional nach Text im Inhalt.', {path:str('Ordner, in dem gesucht wird'), name_pattern:str('z. B. *.cs oder *config*'), contains:str('Gesuchter Text (optional)')}, ['path']),
+  fn('file_info', 'Größe und Datum einer Datei oder eines Ordners.', {path:str('Vollständiger Pfad')}, ['path']),
+  fn('gh_list', 'Listet Dateien in deinem GitHub-Repository.', {path:str('Ordner im Repo, leer = Wurzel'), recursive:bool('Gesamten Baum auflisten')}),
+  fn('gh_read', 'Liest eine Datei aus deinem GitHub-Repository.', {path:str('Pfad im Repo, z. B. src/Nuro/wwwroot/index.html')}, ['path']),
+  fn('gh_write', 'Schreibt eine Datei ins GitHub-Repository und committet sie direkt (kompletter Inhalt).', {path:str('Pfad im Repo'), content:str('Kompletter neuer Dateiinhalt'), message:str('Commit-Nachricht')}, ['path', 'content', 'message']),
+  fn('gh_edit', 'Ersetzt in einer Repo-Datei einen exakt vorkommenden Textabschnitt und committet (besser als gh_write für kleine Änderungen an großen Dateien).', {path:str('Pfad im Repo'), old_text:str('Exakter alter Text (genau einmal vorhanden)'), new_text:str('Neuer Text'), message:str('Commit-Nachricht')}, ['path', 'old_text', 'new_text', 'message']),
+  fn('gh_delete', 'Löscht eine Datei im GitHub-Repository (mit Commit).', {path:str('Pfad im Repo'), message:str('Commit-Nachricht')}, ['path', 'message']),
+  fn('gh_commits', 'Zeigt die letzten Commits.', {limit:int('Anzahl, Standard 10')}),
+  fn('gh_issues', 'Listet Issues.', {state:str('open, closed oder all')}),
+  fn('gh_issue_read', 'Liest ein Issue mit Kommentaren.', {number:int('Issue-Nummer')}, ['number']),
+  fn('gh_issue_create', 'Legt ein Issue an.', {title:str('Titel'), body:str('Beschreibung (Markdown)')}, ['title']),
+  fn('gh_issue_comment', 'Kommentiert ein Issue.', {number:int('Issue-Nummer'), body:str('Kommentar')}, ['number', 'body']),
+  fn('gh_issue_close', 'Schließt ein Issue.', {number:int('Issue-Nummer')}, ['number']),
+  fn('gh_actions', 'Zeigt die letzten GitHub-Actions-Läufe (z. B. ob der exe-Build geklappt hat).', {limit:int('Anzahl, Standard 5')}),
+  fn('gpu_status', 'Zeigt Auslastung, Grafikspeicher und Temperatur der NVIDIA-Grafikkarte sowie die geladenen Modelle.'),
+];
+const TOOL_LABEL = {list_allowed_folders:'Freigaben ansehen', list_dir:'Ordner ansehen', read_file:'Datei lesen', write_file:'Datei schreiben', edit_file:'Datei ändern',
+  create_folder:'Ordner anlegen', delete_path:'Löschen', move_path:'Verschieben', search_files:'Dateien suchen', file_info:'Datei-Info',
+  gh_list:'GitHub: Dateien', gh_read:'GitHub: lesen', gh_write:'GitHub: committen', gh_edit:'GitHub: ändern',gh_delete:'GitHub: löschen', gh_commits:'GitHub: Commits',
+  gh_issues:'GitHub: Issues', gh_issue_read:'GitHub: Issue lesen', gh_issue_create:'GitHub: Issue anlegen', gh_issue_comment:'GitHub: kommentieren',
+  gh_issue_close:'GitHub: Issue schließen', gh_actions:'GitHub: Builds', gpu_status:'Grafikkarte'};
+function toolSystemPrompt(){
+  const folders = HS.folders.length ? HS.folders.join(', ') : '(noch keine – bitte den Nutzer, in den Einstellungen einen Ordner freizugeben)';
+  return `Du bist Nuro, ein KI-Assistent, der lokal auf dem Windows-PC des Nutzers läuft (Modell ${S.model} über Ollama auf der NVIDIA-Grafikkarte).
+Du hast Werkzeuge und arbeitest selbstständig: Plane kurz, rufe Werkzeuge auf, prüfe die Ergebnisse und mach weiter, bis die Aufgabe erledigt ist. Frag nur nach, wenn etwas wirklich unklar ist. Erfinde keine Dateiinhalte – lies sie.
+Dateien: Du darfst in diesen Ordnern ohne Rückfrage lesen, schreiben, verschieben und löschen: ${folders}. Verwende vollständige Windows-Pfade. Lies eine Datei, bevor du sie änderst; für kleine Änderungen nutze edit_file.
+GitHub: Du hast Zugriff auf dein eigenes Repository ${HS.repo} (Branch ${HS.branch}). Dort liegt dein Quellcode: Oberfläche in src/Nuro/wwwroot/index.html, Windows-Host (C#) in src/Nuro/*.cs. Jeder Commit auf ${HS.branch} baut automatisch eine neue Nuro.exe über GitHub Actions; prüfe den Build danach mit gh_actions. Ändere eigenen Code nur gezielt und lies die Datei vorher vollständig.${HS.hasToken ? '' : ' Hinweis: Es ist noch kein GitHub-Token hinterlegt.'}
+Fasse am Ende knapp zusammen, was du getan hast.`;
+}
 
 /* ---------- Speicher (IndexedDB) ---------- */
 let db;
@@ -379,6 +484,12 @@ async function loadCaps(){
   $('#caps').innerHTML = caps.map(c => label[c] ? `<span class="badge">${label[c]}</span> ` : '').join('');
   $('#thinkSel').style.display = caps.includes('thinking') ? '' : 'none';
   $('#thinkSel').value = S.think;
+  if (NURO){
+    const tb = $('#toolsBtn'), can = caps.includes('tools');
+    tb.style.display = ''; tb.disabled = !can;
+    tb.classList.toggle('on', can && S.tools);
+    tb.title = can ? (S.tools ? 'Werkzeuge an: Nuro arbeitet selbstständig mit Dateien, GitHub und der Grafikkarte' : 'Werkzeuge aus') : `${S.model || 'Dieses Modell'} unterstützt keine Werkzeuge`;
+  }
   $('#emptySub').textContent = S.model ? `Läuft komplett lokal mit ${S.model}.` : 'Läuft komplett lokal über Ollama.';
 }
 async function streamChat(body, onChunk, signal){
@@ -443,7 +554,16 @@ function msgHTML(m, idx, isLast){
     return `<div class="msg user" data-i="${idx}">${att}<div class="bubble">${esc(m.content)}</div>
       <div class="acts"><button class="ib" data-act="copy" title="Kopieren">⧉</button><button class="ib" data-act="edit" title="Bearbeiten">✎</button></div></div>`;
   }
+  if (m.role === 'tool'){
+    const a = m.args || {};
+    const main = a.path || a.from || a.title || (a.number ? '#' + a.number : '') || '';
+    const st = m.running ? '<span class="st"><span class="spin"></span></span>' : m.ok ? '<span class="st ok">✓</span>' : '<span class="st bad">✗</span>';
+    const res = (m.content || '').length > 6000 ? m.content.slice(0, 6000) + '\n… (gekürzt angezeigt)' : (m.content || '');
+    return `<div class="msg tool" data-i="${idx}"><details class="toolcard"><summary>🔧 <b>${esc(TOOL_LABEL[m.tool_name] || m.tool_name)}</b><span class="arg">${esc(main)}</span>${st}</summary>
+      <div class="tb"><div class="lbl">Eingabe</div><pre>${esc(JSON.stringify(a, null, 2))}</pre>${m.running ? '' : `<div class="lbl">Ergebnis</div><pre>${esc(res)}</pre>`}</div></details></div>`;
+  }
   const streaming = isLast && abortCtl;
+  if (!m.content && !m.thinking && !m.error && !m.stopped && (m.tool_calls || []).length) return `<div class="msg assistant" data-i="${idx}" style="margin:0"></div>`;
   let think = '';
   if (m.thinking) think = `<details class="think"${streaming && !m.content ? ' open' : ''}><summary>${streaming && !m.content ? 'Denkt nach …' : 'Gedankengang'}</summary><div class="tb">${esc(m.thinking)}</div></details>`;
   const body = m.content ? md(m.content) : '';
@@ -484,7 +604,11 @@ $('#msgs').addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const el = b.closest('.msg'), i = +el.dataset.i, m = cur.messages[i];
   if (b.dataset.act === 'copy'){ await navigator.clipboard.writeText(m.content); toast('Kopiert'); }
-  if (b.dataset.act === 'regen'){ if (abortCtl) return; cur.messages.splice(i, 1); render(); generate(); }
+  if (b.dataset.act === 'regen'){
+    if (abortCtl) return;
+    let u = i; while (u >= 0 && cur.messages[u].role !== 'user') u--;
+    cur.messages.splice(u + 1); await saveChat(cur); render(); generate();
+  }
   if (b.dataset.act === 'edit'){
     if (abortCtl) return;
     const bub = el.querySelector('.bubble');
@@ -510,7 +634,10 @@ function toApi(m){
     if ((m.images || []).length) o.images = m.images.map(x => x.data);
     return o;
   }
-  return {role:'assistant', content:m.content || ''};
+  if (m.role === 'tool') return {role:'tool', tool_name:m.tool_name, content:m.content || ''};
+  const o = {role:'assistant', content:m.content || ''};
+  if ((m.tool_calls || []).length) o.tool_calls = m.tool_calls;
+  return o;
 }
 async function send(){
   if (abortCtl){ abortCtl.abort(); return; }
@@ -527,33 +654,86 @@ async function send(){
   await saveChat(cur); render(); toBottom();
   generate();
 }
-async function generate(){
-  const chat = cur;
+function buildMessages(chat, useTools){
   const messages = [];
   let sys = S.system.trim();
+  if (useTools) sys = toolSystemPrompt() + (sys ? '\n\nAnweisungen des Nutzers:\n' + sys : '');
   if (S.date){ const d = new Date(); sys = `Aktuelles Datum: ${d.toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}, ${d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})} Uhr.` + (sys ? '\n\n' + sys : ''); }
   if (sys) messages.push({role:'system', content:sys});
-  chat.messages.forEach(m => { if (!m.error || m.content) messages.push(toApi(m)); });
-  const a = {role:'assistant', content:'', thinking:'', model:S.model};
-  chat.messages.push(a);
-  abortCtl = new AbortController(); setBusy(true); render(); toBottom();
-  const body = {model:S.model, messages, stream:true, keep_alive: S.keep === '-1' ? -1 : S.keep, options:{temperature:+S.temp, num_ctx:+S.ctx}};
-  if (caps.includes('thinking') && S.think !== 'auto') body.think = S.think === 'on';
+  for (const m of chat.messages){
+    if (m.role === 'assistant' && !m.content && !(m.tool_calls || []).length) continue;   // leere/fehlgeschlagene Antworten
+    if (m.role === 'tool' && !useTools) continue;
+    if (m.role === 'assistant' && !useTools && !m.content) continue;
+    const o = toApi(m);
+    if (!useTools && o.tool_calls) delete o.tool_calls;
+    messages.push(o);
+  }
+  return messages;
+}
+async function generate(){
+  const chat = cur;
+  if (NURO) await refreshHost();
+  const useTools = toolsOn();
+  const maxSteps = Math.max(1, Math.min(100, parseInt(S.maxSteps) || 25));
+  abortCtl = new AbortController(); setBusy(true);
+  let a = null;
   try {
-    await streamChat(body, j => {
-      if (j.message){ a.content += j.message.content || ''; a.thinking += j.message.thinking || ''; }
-      if (j.done && j.eval_count) a.stats = {tokens:j.eval_count, tps: j.eval_count / ((j.eval_duration || 1) / 1e9)};
-      if (cur === chat) renderLast();
-    }, abortCtl.signal);
+    for (let step = 0; step < maxSteps; step++){
+      a = {role:'assistant', content:'', thinking:'', model:S.model};
+      const messages = buildMessages(chat, useTools);
+      chat.messages.push(a);
+      if (cur === chat){ render(); if (step === 0) toBottom(); }
+      const body = {model:S.model, messages, stream:true, keep_alive: S.keep === '-1' ? -1 : S.keep, options:{temperature:+S.temp, num_ctx:+S.ctx}};
+      if (caps.includes('thinking') && S.think !== 'auto') body.think = S.think === 'on';
+      if (useTools) body.tools = TOOLS;
+      const calls = [];
+      await streamChat(body, j => {
+        if (j.message){
+          a.content += j.message.content || ''; a.thinking += j.message.thinking || '';
+          if (j.message.tool_calls) calls.push(...j.message.tool_calls);
+        }
+        if (j.done && j.eval_count) a.stats = {tokens:j.eval_count, tps: j.eval_count / ((j.eval_duration || 1) / 1e9)};
+        if (cur === chat) renderLast();
+      }, abortCtl.signal);
+      a.content = a.content.replace(/^\s+/, '');
+      if (!calls.length || !useTools) break;
+
+      a.tool_calls = calls;
+      await saveChat(chat);
+      for (const tc of calls){
+        const name = tc.function?.name || '';
+        let args = tc.function?.arguments || {};
+        if (typeof args === 'string'){ try { args = JSON.parse(args); } catch { args = {}; } }
+        const t = {role:'tool', tool_name:name, args, content:'', running:true};
+        chat.messages.push(t);
+        if (cur === chat){ const stick = nearBottom(); render(); if (stick) toBottom(); }
+        try {
+          const r = await host('/api/tool', {name, args});
+          t.ok = !!r.ok; t.content = r.ok ? String(r.result ?? '') : 'FEHLER: ' + r.error;
+        } catch (e) { t.ok = false; t.content = 'FEHLER: ' + e.message; }
+        t.running = false;
+        if (cur === chat){ const stick = nearBottom(); render(); if (stick) toBottom(); }
+        if (abortCtl.signal.aborted) throw new DOMException('Abgebrochen', 'AbortError');
+      }
+      await saveChat(chat);
+      if (step === maxSteps - 1){
+        a = {role:'assistant', content:'', model:S.model, error:`Schrittlimit (${maxSteps}) erreicht – schreib „weiter“, damit Nuro fortfährt.`};
+        chat.messages.push(a);
+      }
+    }
   } catch (e) {
-    if (e.name === 'AbortError') a.stopped = true;
-    else a.error = /Failed to fetch|NetworkError/.test(e.message) ? 'Ollama ist nicht erreichbar. Läuft Ollama?' : e.message;
+    let last = chat.messages[chat.messages.length - 1];
+    if (!last || last.role !== 'assistant'){ last = {role:'assistant', content:'', model:S.model}; chat.messages.push(last); }
+    if (last.role === 'tool') last.running = false;
+    if (e.name === 'AbortError') last.stopped = true;
+    else last.error = /Failed to fetch|NetworkError/.test(e.message) ? 'Ollama ist nicht erreichbar. Läuft Ollama?' : e.message;
+    a = last;
   } finally {
-    a.content = a.content.replace(/^\s+/, '');
+    chat.messages.forEach(m => { if (m.role === 'tool' && m.running){ m.running = false; m.ok = false; m.content = m.content || 'Abgebrochen'; } });
     abortCtl = null; setBusy(false);
     await saveChat(chat);
     if (cur === chat) render();
-    if (!chat.titled && !a.error) autoTitle(chat);
+    if (!chat.titled && a && !a.error) autoTitle(chat);
   }
 }
 function setBusy(b){ const s = $('#send'); s.textContent = b ? '■' : '↑'; s.title = b ? 'Stoppen' : 'Senden (Enter)'; }
@@ -620,6 +800,38 @@ $('#newChat').onclick = () => { if (abortCtl) return toast('Bitte erst die laufe
 $('#search').oninput = renderList;
 $('#model').onchange = async e => { S.model = e.target.value; saveS(); await loadCaps(); };
 $('#thinkSel').onchange = e => { S.think = e.target.value; saveS(); };
+$('#toolsBtn').onclick = () => { S.tools = !S.tools; saveS(); loadCaps(); toast(S.tools ? 'Werkzeuge an' : 'Werkzeuge aus'); };
+
+/* ---------- Grafikkarte & Updates (nur in Nuro.exe) ---------- */
+async function pollGpu(){
+  if (!NURO) return;
+  try {
+    const r = await host('/api/gpu');
+    const g = (r.gpus || [])[0], el = $('#gpu');
+    if (!g){ el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.textContent = `${g.name.replace(/^NVIDIA\s+(GeForce\s+)?/i, '')} · ${(g.memUsedMb / 1024).toFixed(1)}/${(g.memTotalMb / 1024).toFixed(0)} GB · ${g.utilPercent} % · ${g.tempC} °C`;
+    el.title = (r.gpus || []).map(x => `${x.name}\nVRAM ${x.memUsedMb} / ${x.memTotalMb} MB\nAuslastung ${x.utilPercent} %\n${x.tempC} °C · ${Math.round(x.powerW)} W\nTreiber ${x.driver}`).join('\n\n')
+      + '\n\n' + ((r.models || []).length ? 'Geladen:\n' + r.models.map(m => `${m.name} – ${(m.sizeBytes / 1e9).toFixed(1)} GB, ${m.sizeBytes ? Math.round(100 * m.vramBytes / m.sizeBytes) : 0} % im VRAM`).join('\n') : 'Kein Modell geladen');
+  } catch {}
+}
+let updInfo = null;
+async function checkUpdate(){
+  if (!NURO || !HS.hasToken) return;
+  try {
+    updInfo = await host('/api/update-check');
+    const b = $('#upd');
+    if (updInfo.ok && updInfo.newer){ b.style.display = 'inline-block'; b.textContent = `⬆ Update ${updInfo.latest}`; b.title = `Installiert: ${updInfo.current} · Neu: ${updInfo.latest}`; }
+    else b.style.display = 'none';
+  } catch {}
+}
+$('#upd').onclick = async () => {
+  if (abortCtl) return toast('Bitte erst die laufende Antwort stoppen');
+  if (!confirm(`Nuro ${updInfo.latest} herunterladen und installieren? Nuro startet danach neu.`)) return;
+  toast('Update wird geladen …');
+  try { const r = await host('/api/update-install'); toast(r.message || r.error || 'Update gestartet'); }
+  catch (e) { toast('Update fehlgeschlagen: ' + e.message); }
+};
 $('#toggleSide').onclick = () => { S.sideHidden = !S.sideHidden; saveS(); $('#side').classList.toggle('hidden', S.sideHidden); };
 addEventListener('keydown', e => {
   if (e.key === 'Escape' && abortCtl) abortCtl.abort();
@@ -633,8 +845,9 @@ function download(name, text, type){
 }
 $('#exportChat').onclick = () => {
   if (!cur) return toast('Kein Chat geöffnet');
-  const t = `# ${cur.title}\n\n` + cur.messages.map(m => `## ${m.role === 'user' ? 'Du' : 'Assistent (' + (m.model || '') + ')'}\n\n` +
-    ((m.files || []).map(f => `📄 ${f.name}\n\n`).join('')) + (m.content || '')).join('\n\n---\n\n');
+  const t = `# ${cur.title}\n\n` + cur.messages.filter(m => m.role !== 'assistant' || m.content || m.error).map(m =>
+    m.role === 'tool' ? `> 🔧 **${TOOL_LABEL[m.tool_name] || m.tool_name}** \`${JSON.stringify(m.args || {})}\` ${m.ok ? '✓' : '✗'}` :
+    `## ${m.role === 'user' ? 'Du' : 'Nuro (' + (m.model || '') + ')'}\n\n` + ((m.files || []).map(f => `📄 ${f.name}\n\n`).join('')) + (m.content || m.error || '')).join('\n\n');
   download(cur.title.replace(/[\\/:*?"<>|]/g, '_') + '.md', t, 'text/markdown');
 };
 
@@ -642,8 +855,39 @@ $('#exportChat').onclick = () => {
 function openSettings(){
   $('#sUrl').value = S.url; $('#sSystem').value = S.system; $('#sTemp').value = S.temp; $('#sTempV').textContent = S.temp;
   $('#sCtx').value = String(S.ctx); $('#sTheme').value = S.theme; $('#sKeep').value = S.keep; $('#sDate').checked = S.date;
+  if (NURO){
+    $('#hostSettings').style.display = '';
+    $('#sTools').checked = S.tools; $('#sSteps').value = S.maxSteps;
+    refreshHost().then(() => {
+      renderFolders(); $('#sRepo').value = HS.repo; $('#sBranch').value = HS.branch;
+      $('#sToken').value = ''; $('#sToken').placeholder = HS.hasToken ? '•••••••• (gespeichert – leer lassen, um ihn zu behalten)' : 'github_pat_…';
+      $('#ghRes').textContent = '';
+      $('#verInfo').textContent = `Nuro ${HS.version} · Daten: %LOCALAPPDATA%\\Nuro`;
+    });
+  }
   $('#settings').classList.add('open');
 }
+function renderFolders(){
+  $('#folderList').innerHTML = HS.folders.length
+    ? HS.folders.map((f, i) => `<div class="f"><span title="${esc(f)}">📁 ${esc(f)}</span><button class="ib" data-rmf="${i}" title="Freigabe entfernen">✕</button></div>`).join('')
+    : '<div class="small">Noch keine Ordner freigegeben.</div>';
+}
+$('#folderList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-rmf]'); if (!b) return;
+  const folders = HS.folders.filter((_, i) => i !== +b.dataset.rmf);
+  HS = await host('/api/config', {folders}); renderFolders();
+});
+$('#addFolder').onclick = async () => { HS = await host('/api/pick-folder'); renderFolders(); };
+$('#ghTest').onclick = async () => {
+  const tok = $('#sToken').value.trim();
+  HS = await host('/api/config', {repo:$('#sRepo').value.trim(), branch:$('#sBranch').value.trim(), ...(tok ? {token:tok} : {})});
+  $('#sToken').value = ''; $('#sToken').placeholder = HS.hasToken ? '•••••••• (gespeichert)' : 'github_pat_…';
+  $('#ghRes').textContent = 'Teste …'; $('#ghRes').className = 'small';
+  const r = await host('/api/github-test');
+  $('#ghRes').className = r.ok ? 'small ok-t' : 'small bad-t';
+  $('#ghRes').textContent = r.ok ? `✓ ${r.name} (${r.isPrivate ? 'privat' : 'öffentlich'}${r.push ? ', Schreibzugriff' : ', nur Lesen!'})` : '✗ ' + r.error;
+  if (r.ok) checkUpdate();
+};
 $('#openSettings').onclick = openSettings;
 $('#sTemp').oninput = e => $('#sTempV').textContent = e.target.value;
 $('#sCancel').onclick = () => $('#settings').classList.remove('open');
@@ -652,6 +896,12 @@ $('#sSave').onclick = async () => {
   const urlChanged = S.url !== $('#sUrl').value.trim();
   Object.assign(S, {url:$('#sUrl').value.trim() || DEF.url, system:$('#sSystem').value, temp:+$('#sTemp').value, ctx:+$('#sCtx').value,
     theme:$('#sTheme').value, keep:$('#sKeep').value, date:$('#sDate').checked});
+  if (NURO){
+    S.tools = $('#sTools').checked; S.maxSteps = Math.max(1, Math.min(100, parseInt($('#sSteps').value) || 25));
+    const tok = $('#sToken').value.trim();
+    try { HS = await host('/api/config', {repo:$('#sRepo').value.trim(), branch:$('#sBranch').value.trim(), ...(tok ? {token:tok} : {})}); } catch {}
+    loadCaps(); checkUpdate();
+  }
   saveS(); applyTheme(); $('#settings').classList.remove('open'); toast('Gespeichert');
   if (urlChanged) checkOllama();
 };
@@ -681,7 +931,9 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme
   chats = await dbAll();
   render();
   $('#input').focus();
+  await refreshHost();
   await checkOllama();
+  if (NURO){ pollGpu(); setInterval(pollGpu, 5000); checkUpdate(); setInterval(checkUpdate, 30 * 60000); }
   setInterval(() => { if (!abortCtl) fetch(base() + '/api/version').then(() => { if ($('#dot').classList.contains('bad')) checkOllama(); }).catch(() => setStatus(false, 'Ollama nicht erreichbar')); }, 10000);
 })();
 </script>

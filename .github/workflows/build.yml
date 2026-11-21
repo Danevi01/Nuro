@@ -1,0 +1,44 @@
+name: Nuro.exe bauen
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Version festlegen
+        shell: pwsh
+        run: echo "NURO_VERSION=1.0.${{ github.run_number }}" >> $env:GITHUB_ENV
+
+      - name: Nuro.exe bauen
+        run: dotnet publish src/Nuro/Nuro.csproj -c Release -o out -p:Version=${{ env.NURO_VERSION }}
+
+      - name: Build-Ergebnis hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nuro-${{ env.NURO_VERSION }}
+          path: out/Nuro.exe
+
+      - name: Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.NURO_VERSION }}
+          name: Nuro ${{ env.NURO_VERSION }}
+          body: "Automatisch gebaut aus ${{ github.sha }}: ${{ github.event.head_commit.message }}"
+          files: out/Nuro.exe
+          make_latest: true

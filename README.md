@@ -1,42 +1,62 @@
 # Nuro
 
-Nuro ist eine Chat-App für Windows im Stil von Claude, die komplett lokal mit [Ollama](https://ollama.com) läuft. Du musst nichts installieren außer Ollama selbst: Die App nutzt PowerShell und Microsoft Edge, die bei Windows schon dabei sind.
+Nuro ist ein lokaler KI-Assistent für Windows im Stil von Claude. Er läuft mit [Ollama](https://ollama.com) auf deiner NVIDIA-Grafikkarte und arbeitet selbstständig mit Werkzeugen: Er liest und schreibt Dateien in freigegebenen Ordnern, pflegt sein eigenes GitHub-Repository und behält die Grafikkarte im Blick.
 
-## Starten
+## Installation
 
-1. Repo herunterladen (**Code → Download ZIP**) und an einen festen Ort entpacken, z. B. `C:\Tools\Nuro`.
-2. Einmal `Verknuepfung-erstellen.bat` ausführen. Danach liegt **Nuro** auf dem Desktop und im Startmenü.
-3. Über die Verknüpfung starten (oder mit `Start.bat`).
+1. Unter **[Releases](../../releases/latest)** die neueste `Nuro.exe` herunterladen.
+2. In einen eigenen Ordner legen, z. B. `C:\Tools\Nuro\Nuro.exe`, und starten.
 
-Die App öffnet sich als eigenes Fenster. Wenn Ollama nicht läuft, wird es automatisch gestartet. Schließt du das Fenster, beendet sich auch der Hintergrund-Server.
+Weitere Voraussetzungen:
+- **Ollama** muss installiert sein. Läuft es nicht, startet Nuro es selbst.
+- **WebView2** ist bei Windows 10/11 schon dabei.
+- Eine **.NET-Installation** ist nicht nötig, sie steckt in der exe.
+
+Beim ersten Start meldet Windows SmartScreen eventuell „unbekannter Herausgeber“, weil die exe nicht signiert ist. Klick auf „Weitere Informationen“ und dann auf „Trotzdem ausführen“.
+
+## Einrichten (Einstellungen ⚙)
+
+- **Freigegebene Ordner:** In diesen Ordnern darf Nuro ohne Rückfrage lesen, schreiben, verschieben und löschen. Außerhalb davon hat Nuro keinen Zugriff.
+- **GitHub-Token:** Unter [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) einen *Fine-grained token* erstellen.
+  - Repository access: *Only select repositories* → `Danevi01/Nuro`
+  - Permissions: **Contents** Read and write, **Issues** Read and write, **Actions** Read-only (Metadata wird automatisch gesetzt)
+
+  Den Token in Nuro eintragen und auf „Verbindung testen“ klicken. Er wird mit Windows-Verschlüsselung (DPAPI) nur für dein Benutzerkonto gespeichert.
 
 ## Funktionen
 
-- **Chats:** mehrere Chats mit Seitenleiste, Suche, Umbenennen und Löschen; automatische Titel, sortiert nach Datum
-- **Antworten:** erscheinen live (Streaming) und lassen sich mit dem Knopf oder mit Esc stoppen
-- **Darstellung:** Markdown mit Code-Hervorhebung und Kopieren-Knopf, Tabellen, Listen
-- **Gedankengang:** einklappbar bei Modellen mit Denkmodus, mit Schalter Auto / An / Aus
-- **Anhänge:** Bilder (bei Modellen mit Bildverständnis) sowie Text- und Code-Dateien, per Büroklammer, Hineinziehen oder Strg+V
-- **Nachrichten:** eigene Nachricht bearbeiten und neu senden, Antwort neu erzeugen
-- **Modelle:** Auswahl oben; die Fähigkeiten des Modells werden als Plakette angezeigt
-- **Einstellungen:** eigene Anweisungen (System-Prompt), Temperatur, Kontextlänge, helles oder dunkles Design, wie lange das Modell geladen bleibt
-- **Sichern:** einzelne Chats als Markdown exportieren, alle Chats sichern und wiederherstellen
+- **Chat:** mehrere Chats, Suche, automatische Titel, Live-Antworten, Markdown mit Code-Hervorhebung, Bilder und Dateien anhängen, Nachricht bearbeiten, Antwort neu erzeugen, Export
+- **Selbstständiges Arbeiten:** Nuro plant, ruft Werkzeuge auf, prüft die Ergebnisse und macht weiter, bis die Aufgabe erledigt ist (einstellbar, Standard: max. 25 Schritte). Jeder Schritt wird als aufklappbare Karte angezeigt. Mit 🔧 im Eingabefeld schaltest du die Werkzeuge an oder aus.
+- **Werkzeuge:**
+
+  | Bereich | Werkzeuge |
+  |---|---|
+  | Dateien | Ordner ansehen, lesen, schreiben, gezielt ändern, anlegen, verschieben, löschen, suchen (Name und Inhalt) |
+  | GitHub | Dateien auflisten, lesen, schreiben und ändern (mit direktem Commit), löschen, Commits, Issues (lesen, anlegen, kommentieren, schließen), Build-Status |
+  | Grafikkarte | Auslastung, VRAM, Temperatur, Stromverbrauch, geladene Modelle |
+
+- **GPU-Anzeige:** oben rechts, mit Details zum geladenen Modell beim Darüberfahren
+- **Selbst-Update:** Jeder Commit auf `main` baut automatisch eine neue `Nuro.exe` (GitHub Actions → Releases). Gibt es eine neuere Version, zeigt Nuro oben den Knopf **⬆ Update** und tauscht sich auf Klick selbst aus. So kann Nuro seinen eigenen Code im Repo verbessern und danach die neue Version installieren.
+
+> **Hinweis:** Die Werkzeuge brauchen ein Modell mit Werkzeug-Unterstützung. Das Modell muss in Ollama die Fähigkeit *tools* haben; die Plakette „Werkzeuge“ neben der Modellwahl zeigt es an.
 
 ## Aufbau
 
-| Datei | Zweck |
+| Pfad | Zweck |
 |---|---|
-| `Nuro.ps1` | Mini-Webserver auf `http://127.0.0.1:8765` (nur lokal erreichbar); öffnet das App-Fenster und startet bei Bedarf Ollama |
-| `app/index.html` | die komplette Oberfläche; spricht direkt mit Ollama auf `http://127.0.0.1:11434` |
-| `Start.bat` | startet die App ohne Konsolenfenster |
-| `Verknuepfung-erstellen.bat/.ps1` | legt die Verknüpfungen auf dem Desktop und im Startmenü an |
+| `src/Nuro/wwwroot/index.html` | Oberfläche und Arbeitsschleife (spricht mit Ollama auf `127.0.0.1:11434`) |
+| `src/Nuro/MainForm.cs` | Fenster mit WebView2 |
+| `src/Nuro/LocalServer.cs` | lokaler Server auf `127.0.0.1:8765`; liefert die Oberfläche aus und stellt die Werkzeuge bereit (nur mit Sitzungs-Token erreichbar) |
+| `src/Nuro/FileTools.cs` | Dateizugriff, auf freigegebene Ordner beschränkt |
+| `src/Nuro/GitHubTools.cs` | GitHub-REST-API für das eigene Repo |
+| `src/Nuro/GpuTools.cs` | NVIDIA-Status über `nvidia-smi` |
+| `src/Nuro/Updater.cs` | Selbst-Update aus den Releases |
+| `.github/workflows/build.yml` | baut die exe und veröffentlicht sie als Release |
+
+Selbst bauen: `dotnet publish src/Nuro/Nuro.csproj -c Release -o out` (.NET 8 SDK, Windows)
 
 ## Daten
 
-Alles bleibt auf deinem PC. Die Chats liegen im App-Profil unter `%LOCALAPPDATA%\Nuro\browser-profil`.
-
-## Probleme?
-
-- **„Ollama nicht erreichbar“:** Ollama starten oder in den Einstellungen die Adresse prüfen.
-- **Ollama läuft auf einem anderen Rechner:** dort `OLLAMA_ORIGINS` passend setzen.
-- **Port 8765 ist belegt:** in `Nuro.ps1` oben `$Port` ändern. Achtung: Mit einer anderen Port-Nummer werden die Chats getrennt gespeichert.
+Alles bleibt auf deinem PC:
+- **Chats:** `%LOCALAPPDATA%\Nuro\webview`
+- **Einstellungen:** `%LOCALAPPDATA%\Nuro\config.json`

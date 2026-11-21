@@ -5,3 +5,5 @@
 *.svg text eol=lf
 *.md text eol=lf
 *.ico binary
+*.cs text eol=crlf
+*.csproj text eol=crlf
