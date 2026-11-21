@@ -22,8 +22,9 @@ public sealed class Tools
     public Task<string> RunAsync(string name, JsonElement a) => name switch
     {
         // Gedächtnis
-        "memory_read" => Memory.ReadMemoryAsync(),
-        "memory_write" => Memory.SaveMemoryAsync(S(a, "project"), S(a, "status"), S(a, "completed"), S(a, "active"), S(a, "notes")),
+        "memory_read" => Memory.GetMemoryAsync(S(a, "key")),
+        "memory_write" => Memory.SaveMemoryAsync(S(a, "key"), S(a, "content")),
+        "memory_search" => Memory.SearchMemoryAsync(S(a, "query")),
 
         // Dateien
         "list_allowed_folders" => Task.FromResult(Files.ListRoots()),
