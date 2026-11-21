@@ -196,6 +196,18 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
 .chips button{border:1px solid var(--line);background:var(--surf);border-radius:10px;padding:5px 10px;font-size:13px;text-align:left}
 .chips button:hover{border-color:var(--accent)}
 .badge.warnb{color:#d9a441;border-color:#d9a441}
+.badge.activeb{color:var(--text);border-color:var(--accent);display:inline-flex;align-items:center;gap:6px;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;font-size:12px;padding:3px 10px}
+#upd{white-space:nowrap}
+#model{min-width:150px;flex-shrink:1}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pl 1.2s ease-in-out infinite;flex:none}
+@keyframes pl{50%{opacity:.25}}
+.msg.agent{margin-left:22px;border-left:2px solid var(--line);padding-left:12px}
+.agentchip{font-size:12px;color:var(--muted);margin-bottom:4px}
+.mtag{font-size:12px}
+.rrow{display:flex;align-items:center;gap:10px;padding:6px 2px;border-bottom:1px solid var(--line)}
+.rrow .rl{width:170px;flex:none}
+.rrow select{flex:1;min-width:0;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:5px 8px;outline:none}
+.rrow.off{opacity:.6}
 .chips button .fit{color:#5cb85c}.chips button .nofit{color:#d9a441}
 .bar{height:8px;background:var(--surf2);border-radius:6px;overflow:hidden;margin:8px 0 4px}
 .bar>div{height:100%;width:0;background:var(--accent);transition:width .3s}
@@ -217,8 +229,10 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
   <main id="main">
     <div id="top">
       <button class="ib" id="toggleSide" title="Seitenleiste">☰</button>
-      <select id="model" title="Modell"></select>
+      <span class="small" style="white-space:nowrap" id="plannerLbl" title="Dieses Modell versteht dich, plant und verteilt Aufgaben an die Spezialisten">🧭 Planer</span>
+      <select id="model" title="Planer-Modell"></select>
       <span id="caps"></span>
+      <span class="badge activeb" id="activeModel" style="display:none"></span>
       <div id="status"><button id="upd"></button><span class="badge" id="gpu" style="display:none"></span><span class="dot" id="dot"></span><span id="statusText">Verbinde …</span></div>
       <button class="ib" id="exportChat" title="Chat als Markdown exportieren">⇩</button>
     </div>
@@ -326,6 +340,12 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
     <div id="mmList" style="margin:8px 0 4px"></div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 8px"><button class="btn" id="mmTest">🔧 Werkzeug-Test</button><button class="btn" id="mmCpu" title="Lädt das aktive Modell nur auf der CPU – zeigt, ob ein Absturz an der Grafikkarte liegt">🖥 Test ohne Grafikkarte</button><span class="small" id="mmTestRes" style="flex-basis:100%"></span></div>
     <div class="sec">
+      <h3>Planer & Spezialisten</h3>
+      <div class="fld" style="margin:4px 0"><label><input type="checkbox" id="rOrch"> Planer verteilt Aufgaben an Spezialisten</label></div>
+      <div class="small">Der Planer (oben ausgewählt) versteht deine Wünsche und gibt Teilaufgaben an das am besten geeignete installierte Modell weiter. „Automatisch“ wählt nach Fähigkeiten, Spezialisierung und Grafikspeicher. ⚠ = größer als der Grafikspeicher.</div>
+      <div id="roleList" style="margin:6px 0"></div>
+    </div>
+    <div class="sec">
       <h3>Neues Modell herunterladen</h3>
       <div class="small">Name aus der <a href="https://ollama.com/search?c=tools" target="_blank" style="color:var(--accent)">Ollama-Bibliothek</a> eintragen (z. B. <code>gpt-oss:20b</code>) oder einen Vorschlag wählen. Für das selbstständige Arbeiten braucht das Modell die Fähigkeit „Werkzeuge“.</div>
       <div class="chips" id="mmSuggest"></div>
@@ -342,7 +362,7 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
-const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:16384, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false, tools:true, maxSteps:30, autoMemory:true};
+const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:16384, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false, tools:true, maxSteps:30, autoMemory:true, orchestrate:true, roles:{}};
 let S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('nuro_settings') || '{}'));
 const saveS = () => localStorage.setItem('nuro_settings', JSON.stringify(S));
 const base = () => S.url.replace(/\/+$/, '');
@@ -417,7 +437,7 @@ const TOOLS = [
   fn('gpu_status', 'Zeigt Auslastung, Grafikspeicher und Temperatur der NVIDIA-Grafikkarte und die geladenen Modelle.'),
 ];
 const LOCAL_TOOLS = new Set(['ask_user', 'chat_search', 'chat_read']);
-const TOOL_LABEL = {ask_user:'Rückfrage', memory_save:'Merken', memory_search:'Gedächtnis durchsuchen', memory_list:'Gedächtnis ansehen', memory_delete:'Vergessen',
+const TOOL_LABEL = {delegate_task:'An Spezialist übergeben', ask_user:'Rückfrage', memory_save:'Merken', memory_search:'Gedächtnis durchsuchen', memory_list:'Gedächtnis ansehen', memory_delete:'Vergessen',
   chat_search:'Frühere Chats durchsuchen', chat_read:'Früheren Chat lesen',
   list_allowed_folders:'Freigaben ansehen', list_dir:'Ordner ansehen', read_file:'Datei lesen', write_file:'Datei schreiben', edit_file:'Datei ändern',
   create_folder:'Ordner anlegen', delete_path:'Löschen', move_path:'Verschieben', search_files:'Dateien suchen', file_info:'Datei-Info', run_command:'Befehl ausführen',
@@ -665,6 +685,186 @@ function explainOllamaError(msg, model = S.model){
   return m;
 }
 
+/* ---------- Planer & Spezialisten ---------- */
+// Der Planer (oben ausgewählt) versteht den Nutzer, beschreibt die Idee, zerlegt sie in Aufgaben
+// und übergibt Einzelaufgaben mit delegate_task an das jeweils am besten geeignete installierte Modell.
+const ROLES = {
+  code:   {label:'Programmieren',     icon:'💻', desc:'Code schreiben und ändern, Fehler beheben, C#, Rust-Plugins, Skripte'},
+  web:    {label:'Webseiten',         icon:'🌐', desc:'HTML, CSS, JavaScript, Layouts und Design von Webseiten'},
+  vision: {label:'Bilder verstehen',  icon:'🖼', desc:'Screenshots, Fotos und Grafiken analysieren und beschreiben'},
+  text:   {label:'Texte & Recherche', icon:'📝', desc:'Texte schreiben, zusammenfassen, übersetzen, Webseiten auswerten'},
+};
+const NOT_ON_WINDOWS = [
+  {label:'Bilder erzeugen', icon:'🎨', note:'Ollama kann Bilder bisher nur auf dem Mac erzeugen (z. B. x/z-image-turbo). Windows-Unterstützung ist angekündigt.'},
+  {label:'Sprache/Audio erzeugen', icon:'🔊', note:'Sprachausgabe (z. B. phonon) läuft in Ollama bisher nur auf dem Mac. Windows-Unterstützung ist angekündigt.'},
+  {label:'Videos', icon:'🎬', note:'Ollama kann keine Videos erzeugen – dafür wäre zusätzliche Software nötig.'},
+];
+let MODELS = [];            // [{name, size, caps}]
+const capCache = {};
+async function refreshModelInfo(){
+  try {
+    const tags = (await (await fetch(base() + '/api/tags')).json()).models || [];
+    MODELS = await Promise.all(tags.map(async m => {
+      const key = m.name + '|' + (m.digest || '');
+      if (!capCache[key]){
+        try {
+          const j = await (await fetch(base() + '/api/show', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:m.name})})).json();
+          capCache[key] = j.capabilities || [];
+        } catch { capCache[key] = []; }
+      }
+      return {name:m.name, size:m.size || 0, caps:capCache[key]};
+    }));
+  } catch {}
+  return MODELS;
+}
+const vramBytes = () => lastGpu ? lastGpu.memTotalMb * 1048576 : null;
+const fitsVram = m => { const v = vramBytes(); return !v || !m.size || m.size <= v * 0.92; };
+function scoreFor(role, m){
+  const n = m.name.toLowerCase(), c = m.caps;
+  if (c.includes('embedding') && !c.includes('completion')) return -1;
+  let s = 0;
+  const coder = /coder|devstral|codestral|codellama|starcoder|codegemma|deepseek-coder/.test(n);
+  if (role === 'code' || role === 'web'){
+    if (coder) s += 20;
+    if (/qwen3|gpt-oss|gemma4|devstral/.test(n)) s += 25;          // aktuelle Generation, zuverlässige Werkzeug-Aufrufe
+    if (/qwen3\.[5-9]|qwen3-coder|devstral/.test(n)) s += 8;     // stark bei agentischem Programmieren
+    if (c.includes('tools')) s += 30; else s -= 25;
+    if (role === 'web' && c.includes('vision')) s += 2;
+  } else if (role === 'vision'){
+    if (!c.includes('vision')) return -1;
+    s += 50; if (c.includes('tools')) s += 10;
+  } else if (role === 'text'){
+    if (coder) s -= 20;
+    if (c.includes('tools')) s += 15;
+    if (c.includes('thinking')) s += 5;
+    if (/gemma|qwen3|gpt-oss|llama|mistral/.test(n)) s += 10;
+  }
+  if (!fitsVram(m)) s -= 60;                 // passt nicht in den Grafikspeicher
+  if (m.name.includes('/')) s -= 15;         // Community-Modell
+  s += Math.min(10, (m.size || 0) / 1e9);    // größer = meist fähiger (bis zur Grenze)
+  return s;
+}
+function autoRole(role){
+  const ranked = MODELS.map(m => ({m, s:scoreFor(role, m)})).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
+  return ranked.length ? ranked[0].m.name : '';
+}
+function roleModel(role){
+  const pick = (S.roles || {})[role];
+  if (pick && MODELS.some(m => m.name === pick)) return pick;
+  return autoRole(role) || S.model;
+}
+const modelCaps = name => (MODELS.find(m => m.name === name) || {}).caps || [];
+const orchestrating = () => !!NURO && S.orchestrate && toolsOn();
+
+function specialistsBlock(){
+  const lines = Object.entries(ROLES).map(([k, r]) => {
+    const mn = roleModel(k);
+    return `- ${k} (${r.label}: ${r.desc}) → ${mn}${mn === S.model ? ' (das bist du selbst – erledige es direkt)' : ''}`;
+  });
+  return `## Du bist der Planer – deine Spezialisten
+Deine Hauptaufgabe: verstehen, was der Nutzer wirklich will (bei Unklarheit ask_user), die Idee klar und vollständig beschreiben, sie in Teilaufgaben zerlegen und jede Teilaufgabe vom am besten geeigneten Modell erledigen lassen. Zugeordnete Spezialisten:
+${lines.join('\n')}
+- Mit delegate_task übergibst du eine Teilaufgabe. Der Spezialist kennt den Chat NICHT: Schreib die Aufgabe vollständig und eigenständig (Ziel, Anforderungen, exakte Pfade mit Angabe LOKAL oder GITHUB, Randbedingungen, erwartetes Ergebnis). Der Spezialist hat dieselben Werkzeuge wie du.
+- Prüfe jedes Ergebnis kritisch (z. B. Datei lesen, Build abwarten) und delegiere bei Bedarf eine Korrektur.
+- Kleine Fragen und Gespräche beantwortest du selbst, ohne zu delegieren.
+Bilder, Audio und Videos können unter Windows mit Ollama derzeit NICHT erzeugt werden – sag das ehrlich, wenn danach gefragt wird.`;
+}
+
+function plannerTools(){
+  if (!orchestrating()) return TOOLS;
+  const roles = Object.keys(ROLES).filter(k => roleModel(k) !== S.model);
+  if (!roles.length) return TOOLS;
+  return [...TOOLS, fn('delegate_task',
+    'Übergibt eine klar beschriebene Teilaufgabe an ein spezialisiertes Modell und liefert dessen Ergebnis zurück. Rollen: ' +
+      roles.map(k => `${k} = ${ROLES[k].label} (${roleModel(k)})`).join(', ') + '.',
+    {role:{type:'string', enum:roles, description:'Welche Spezialisten-Rolle'},
+     task:str('Vollständige, eigenständige Aufgabenbeschreibung inkl. Ziel, Pfaden (LOKAL/GITHUB) und erwartetem Ergebnis'),
+     context:str('Zusätzlicher Kontext, z. B. relevante Ausschnitte oder Entscheidungen des Nutzers (optional)')},
+    ['role', 'task'])];
+}
+
+/* Anzeige: welches Modell arbeitet gerade */
+function setActiveModel(model, role){
+  const el = $('#activeModel');
+  if (!el) return;
+  if (!model){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `<span class="pulse"></span>${role ? `${ROLES[role]?.icon || '🧩'} ${esc(ROLES[role]?.label || role)}: ` : '🧭 Planer: '}<b>${esc(model)}</b>`;
+}
+
+async function runSubAgent(role, task, context, chat){
+  const model = roleModel(role);
+  const scaps = modelCaps(model);
+  const useT = scaps.includes('tools') && S.tools;
+  const r = ROLES[role] || {label:role, desc:''};
+  let sys = `Du bist ein Spezialist für ${r.label} (${r.desc}) und arbeitest für den Planer von Nuro, einem lokalen KI-Assistenten auf dem Windows-PC des Nutzers. Erledige genau die übergebene Aufgabe gründlich und vollständig.`;
+  if (useT) sys += '\n\n' + toolSystemPrompt().replace(/^Du bist Nuro[^\n]*\n/, '').replace(/## Rückfragen[\s\S]*?(?=## Gedächtnis)/, '');
+  else sys += '\nDu hast keine Werkzeuge: Liefere dein Ergebnis (z. B. vollständigen Code) direkt als Antwort.';
+  sys += '\nAntworte am Ende mit einer knappen Zusammenfassung: was du getan hast, welche Dateien betroffen sind und ob etwas offen ist.';
+  const msgs = [{role:'system', content:sys}, {role:'user', content:task + (context ? '\n\nKontext:\n' + context : '')}];
+  const tools = useT ? TOOLS.filter(t => !['ask_user', 'delegate_task'].includes(t.function.name)) : null;
+  const tag = {role, model};
+  let final = '', steps = 0;
+  setActiveModel(model, role);
+  try {
+    for (let step = 0; step < 20; step++){
+      const a = {role:'assistant', content:'', thinking:'', model, agent:tag};
+      chat.messages.push(a);
+      if (cur === chat) render();
+      const body = {model, messages:msgs, stream:true, keep_alive: S.keep === '-1' ? -1 : S.keep, options:{temperature:+S.temp, num_ctx:+S.ctx}};
+      if (scaps.includes('thinking') && S.think !== 'auto') body.think = S.think === 'on';
+      if (tools) body.tools = tools;
+      const calls = [];
+      await streamChat(body, j => {
+        if (j.message){ a.content += j.message.content || ''; a.thinking += j.message.thinking || ''; if (j.message.tool_calls) calls.push(...j.message.tool_calls); }
+        if (j.done && j.eval_count) a.stats = {tokens:j.eval_count, tps:j.eval_count / ((j.eval_duration || 1) / 1e9)};
+        if (cur === chat) renderLast();
+      }, abortCtl.signal);
+      a.content = a.content.replace(/^\s+/, '');
+      if (tools && !calls.length){ const ft = parseTextToolCalls(a.content); if (ft.length) calls.push(...ft); }
+      const am = {role:'assistant', content:a.content};
+      if (calls.length) am.tool_calls = calls.map(c => ({function:{name:c.function.name, arguments:c.function.arguments}}));
+      msgs.push(am);
+      if (!calls.length){ final = a.content; break; }
+      a.tool_calls = calls;
+      for (const tc of calls){
+        const name = tc.function?.name || '';
+        let args = tc.function?.arguments || {};
+        if (typeof args === 'string'){ try { args = JSON.parse(args); } catch { args = {}; } }
+        const t = {role:'tool', tool_name:name, args, content:'', running:true, agent:tag};
+        chat.messages.push(t);
+        if (cur === chat){ const st = nearBottom(); render(); if (st) toBottom(); }
+        try {
+          const res = await execTool(name, args, t, chat);
+          t.ok = !!res.ok; t.content = res.ok ? String(res.result ?? '') : 'FEHLER: ' + res.error;
+          if (res.ok && /^(COMMIT ABGELEHNT|MERGE ABGELEHNT|✗ BUILD FEHLGESCHLAGEN)/.test(t.content)) t.ok = false;
+        } catch (e) { if (e.name === 'AbortError') throw e; t.ok = false; t.content = 'FEHLER: ' + e.message; }
+        t.running = false; steps++;
+        msgs.push({role:'tool', tool_name:name, content:t.content});
+        if (cur === chat){ const st = nearBottom(); render(); if (st) toBottom(); }
+        if (abortCtl.signal.aborted) throw new DOMException('Abgebrochen', 'AbortError');
+      }
+      await saveChat(chat);
+    }
+  } finally {
+    setActiveModel(S.model, null);
+  }
+  if (!final) final = '(Der Spezialist hat das Schrittlimit erreicht, ohne abzuschließen.)';
+  return `Ergebnis von ${model} (${r.label}, ${steps} Werkzeug-Schritte):\n${final}`;
+}
+
+/* Rollen-Verwaltung im Modell-Manager */
+async function renderRoles(){
+  await refreshModelInfo();
+  const opts = sel => `<option value="">Automatisch (${esc(autoRole(sel) || '–')})</option>` +
+    MODELS.map(m => `<option value="${esc(m.name)}"${(S.roles || {})[sel] === m.name ? ' selected' : ''}>${esc(m.name)}${fitsVram(m) ? '' : ' ⚠'}</option>`).join('');
+  $('#roleList').innerHTML =
+    `<div class="rrow"><span class="rl">🧭 Planer (versteht dich, plant, verteilt)</span><b>${esc(S.model)}</b><span class="small">oben in der Modellauswahl</span></div>` +
+    Object.entries(ROLES).map(([k, r]) => `<div class="rrow"><span class="rl">${r.icon} ${esc(r.label)}</span><select data-role="${k}">${opts(k)}</select></div>`).join('') +
+    NOT_ON_WINDOWS.map(x => `<div class="rrow off" title="${esc(x.note)}"><span class="rl">${x.icon} ${esc(x.label)}</span><span class="small">${esc(x.note)}</span></div>`).join('');
+  $('#rOrch').checked = !!S.orchestrate;
+}
+
 /* ---------- Chats ---------- */
 function newChat(){ cur = null; pending = []; renderPending(); render(); $('#input').focus(); }
 function selectChat(id){ if (abortCtl) return toast('Bitte erst die laufende Antwort stoppen'); cur = chats.find(c => c.id === id) || null; render(); }
@@ -731,19 +931,20 @@ function msgHTML(m, idx, isLast){
   }
   if (m.role === 'tool'){
     const a = m.args || {};
-    const main = a.path || a.from || a.command || a.title || a.query || a.url || a.text || (a.number ? '#' + a.number : '') || '';
+    const main = m.tool_name === 'delegate_task' ? `${ROLES[a.role]?.icon || ''} ${ROLES[a.role]?.label || a.role || ''} → ${m.delegateModel || roleModel(a.role)}` : a.path || a.from || a.command || a.title || a.query || a.url || a.text || (a.number ? '#' + a.number : '') || '';
     const st = m.running ? '<span class="st"><span class="spin"></span></span>' : m.ok ? '<span class="st ok">✓</span>' : '<span class="st bad">✗</span>';
     const res = (m.content || '').length > 6000 ? m.content.slice(0, 6000) + '\n… (gekürzt angezeigt)' : (m.content || '');
-    return `<div class="msg tool" data-i="${idx}"><details class="toolcard"><summary>${toolPlace(m.tool_name) === 'gh' ? '<span class="place gh">GitHub</span>' : toolPlace(m.tool_name) === 'pc' ? '<span class="place pc">PC</span>' : '🔧'} <b>${esc(TOOL_LABEL[m.tool_name] || m.tool_name)}</b><span class="arg">${esc(main)}</span>${st}</summary>
+    return `<div class="msg tool${m.agent ? ' agent' : ''}" data-i="${idx}"><details class="toolcard"><summary>${m.agent ? `<span class="mtag" title="${esc(m.agent.model)}">${ROLES[m.agent.role]?.icon || '🧩'}</span>` : ''}${toolPlace(m.tool_name) === 'gh' ? '<span class="place gh">GitHub</span>' : toolPlace(m.tool_name) === 'pc' ? '<span class="place pc">PC</span>' : '🔧'} <b>${esc(TOOL_LABEL[m.tool_name] || m.tool_name)}</b><span class="arg">${esc(main)}</span>${st}</summary>
       <div class="tb"><div class="lbl">Eingabe</div><pre>${esc(JSON.stringify(a, null, 2))}</pre>${m.running ? '' : `<div class="lbl">Ergebnis</div><pre>${esc(res)}</pre>`}</div></details></div>`;
   }
   const streaming = isLast && abortCtl;
   if (!m.content && !m.thinking && !m.error && !m.stopped && (m.tool_calls || []).length) return `<div class="msg assistant" data-i="${idx}" style="margin:0"></div>`;
+  const agentChip = m.agent ? `<div class="agentchip">${ROLES[m.agent.role]?.icon || '🧩'} ${esc(ROLES[m.agent.role]?.label || m.agent.role)} · <b>${esc(m.agent.model)}</b></div>` : '';
   let think = '';
   if (m.thinking) think = `<details class="think"${streaming && !m.content ? ' open' : ''}><summary>${streaming && !m.content ? 'Denkt nach …' : 'Gedankengang'}</summary><div class="tb">${esc(m.thinking)}</div></details>`;
   const body = m.content ? md(m.content) : '';
   const meta = m.stats ? `<span class="meta">${esc(m.model || '')} · ${m.stats.tokens} Tokens · ${m.stats.tps.toFixed(1)} T/s</span>` : (m.model ? `<span class="meta">${esc(m.model)}</span>` : '');
-  return `<div class="msg assistant" data-i="${idx}">${think}<div class="body${streaming ? ' cursor' : ''}">${body}</div>
+  return `<div class="msg assistant${m.agent ? ' agent' : ''}" data-i="${idx}">${agentChip}${think}<div class="body${streaming ? ' cursor' : ''}">${body}</div>
     ${m.stopped ? '<div class="stopped">Abgebrochen</div>' : ''}${m.error ? `<div class="err">⚠ ${esc(m.error)}</div>` : ''}
     ${streaming ? '' : `<div class="acts"><button class="ib" data-act="copy" title="Kopieren">⧉</button>${isLast ? '<button class="ib" data-act="regen" title="Neu generieren">↻</button>' : ''}${meta}</div>`}</div>`;
 }
@@ -942,6 +1143,11 @@ async function execTool(name, args, t, chat){
     if (ans == null) throw new DOMException('Abgebrochen', 'AbortError');
     return {ok:true, result:'Antwort des Nutzers: ' + ans};
   }
+  if (name === 'delegate_task'){
+    if (!ROLES[args.role]) return {ok:false, error:`Unbekannte Rolle „${args.role}“. Erlaubt: ${Object.keys(ROLES).join(', ')}`};
+    t.delegateModel = roleModel(args.role);
+    return {ok:true, result:await runSubAgent(args.role, String(args.task || ''), args.context ? String(args.context) : '', chat)};
+  }
   if (name === 'chat_search') return {ok:true, result:chatSearch(args.query, chat)};
   if (name === 'chat_read') return {ok:true, result:chatRead(args.chat_id)};
   if (name === 'run_command'){
@@ -1085,7 +1291,7 @@ async function autoRemember(chat){
     while (u >= 0 && (chat.messages[u].role !== 'user' || chat.messages[u].hidden)) u--;
     if (u < 0) return;
     const userMsg = chat.messages[u].content || '';
-    const finalA = chat.messages.slice(u).reverse().find(m => m.role === 'assistant' && m.content);
+    const finalA = chat.messages.slice(u).reverse().find(m => m.role === 'assistant' && m.content && !m.agent);
     if (userMsg.trim().length < 12) return;
     await loadMemory();
     const known = MEM.slice(-80).map(m => `[${m.id}] ${m.text}`).join('\n') || '(noch nichts)';
@@ -1140,7 +1346,9 @@ function buildMessages(chat, useTools){
   }
   if (S.date){ const d = new Date(); sys = `Aktuelles Datum: ${d.toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}, ${d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})} Uhr.` + (sys ? '\n\n' + sys : ''); }
   if (sys) messages.push({role:'system', content:sys});
+  if (useTools && orchestrating()) sys = (sys ? sys + '\n\n' : '') + specialistsBlock();
   for (const m of chat.messages){
+    if (m.agent) continue;   // Arbeitsschritte der Spezialisten – der Planer sieht nur deren Ergebnis
     if (m.role === 'assistant' && !m.content && !(m.tool_calls || []).length) continue;   // leere/fehlgeschlagene Antworten
     if (m.role === 'tool' && !useTools) continue;
     if (m.role === 'assistant' && !useTools && !m.content) continue;
@@ -1152,8 +1360,9 @@ function buildMessages(chat, useTools){
 }
 async function generate(){
   const chat = cur;
-  if (NURO){ await refreshHost(); await loadMemory(); }
+  if (NURO){ await refreshHost(); await loadMemory(); await refreshModelInfo(); }
   const useTools = toolsOn();
+  setActiveModel(S.model, null);
   const maxSteps = Math.max(1, Math.min(100, parseInt(S.maxSteps) || 25));
   abortCtl = new AbortController(); setBusy(true);
   let a = null, nudged = false;
@@ -1165,7 +1374,7 @@ async function generate(){
       if (cur === chat){ render(); if (step === 0) toBottom(); }
       const body = {model:S.model, messages, stream:true, keep_alive: S.keep === '-1' ? -1 : S.keep, options:{temperature:+S.temp, num_ctx:+S.ctx}};
       if (caps.includes('thinking') && S.think !== 'auto') body.think = S.think === 'on';
-      if (useTools) body.tools = TOOLS;
+      if (useTools) body.tools = plannerTools();
       const calls = [];
       await streamChat(body, j => {
         if (j.message){
@@ -1226,7 +1435,7 @@ async function generate(){
       if (m.role === 'tool' && m.waiting){ m.waiting = false; m.answer = m.answer ?? null; }
     });
     if (pendingAsk) answerPending(null);
-    abortCtl = null; setBusy(false);
+    abortCtl = null; setBusy(false); setActiveModel(null);
     await saveChat(chat);
     if (cur === chat) render();
     if (!chat.titled && a && !a.error) autoTitle(chat);
@@ -1333,9 +1542,9 @@ $('#mText').addEventListener('keydown', e => { if (e.key === 'Enter') addMem(); 
 /* ---------- Modell-Manager ---------- */
 // VRAM-Klassen nach gängigen Empfehlungen (Q4-Quantisierung); "Werkzeuge" laut Ollama-Bibliothek
 const SUGGEST = [
-  {name:'gemma4:12b', vram:12, note:'Bilder, Denken, Werkzeuge'},
+  {name:'gemma4:12b', vram:12, note:'🧭 Planer: versteht Ideen, sieht Bilder, Werkzeuge'},
+  {name:'qwen3.5:9b', vram:10, note:'💻 Programmieren & 🌐 Webseiten mit Werkzeugen'},
   {name:'gpt-oss:20b', vram:16, note:'Denken, Werkzeuge – stark beim Planen'},
-  {name:'qwen3.5:9b', vram:10, note:'schnell, Werkzeuge'},
   {name:'gemma4:26b', vram:24, note:'Bilder, Denken, Werkzeuge'},
   {name:'qwen3.6:27b', vram:24, note:'stark beim Programmieren mit Werkzeugen'},
   {name:'qwen3-coder:30b', vram:24, note:'spezialisiert aufs Programmieren'},
@@ -1345,7 +1554,14 @@ const gb = b => (b / 1e9).toFixed(1) + ' GB';
 async function openModels(){
   $('#modelModal').classList.add('open');
   await renderModels();
+  await renderRoles();
 }
+$('#roleList').addEventListener('change', e => {
+  const s = e.target.closest('[data-role]'); if (!s) return;
+  S.roles = Object.assign({}, S.roles, {[s.dataset.role]: s.value}); saveS();
+  toast(`${ROLES[s.dataset.role].label}: ${s.value || 'automatisch (' + autoRole(s.dataset.role) + ')'}`);
+});
+$('#rOrch').onchange = e => { S.orchestrate = e.target.checked; saveS(); toast(S.orchestrate ? 'Planer verteilt Aufgaben' : 'Ein Modell für alles'); };
 async function renderModels(){
   let models = [];
   try { models = (await (await fetch(base() + '/api/tags')).json()).models || []; } catch { $('#mmList').innerHTML = '<div class="err">Ollama ist nicht erreichbar.</div>'; return; }
@@ -1390,7 +1606,7 @@ async function useModel(name){
   await checkOllama();
   const opt = [...$('#model').options].find(o => o.value === name || o.value === name + ':latest');
   if (!opt) return toast('Modell nicht gefunden');
-  S.model = opt.value; saveS(); $('#model').value = S.model; await loadCaps(); await renderModels();
+  S.model = opt.value; saveS(); $('#model').value = S.model; await loadCaps(); await renderModels(); await renderRoles();
   toast(`Aktiv: ${S.model}` + (caps.includes('tools') ? '' : ' (ohne Werkzeuge)'));
 }
 $('#mmSuggest').addEventListener('click', e => { const b = e.target.closest('[data-sug]'); if (b){ $('#mmName').value = b.dataset.sug; $('#mmName').focus(); } });
