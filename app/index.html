@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lokal-Chat</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#1e1d1b; --side:#161513; --surf:#2a2826; --surf2:#33302d; --line:#3a3734;
+  --text:#ece9e3; --muted:#9c978e; --accent:#d9825b; --accent2:#c06c46; --err:#e5674f;
+  --code:#141312; --user:#2f2c29; --shadow:0 8px 30px rgba(0,0,0,.35);
+}
+:root.light{
+  --bg:#f8f6f1; --side:#efece5; --surf:#ffffff; --surf2:#f1eee8; --line:#e0dbd2;
+  --text:#2b2925; --muted:#77716a; --accent:#c96f45; --accent2:#b05e38; --err:#c2412b;
+  --code:#f3f0ea; --user:#ebe7df; --shadow:0 8px 30px rgba(0,0,0,.12);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.6 "Segoe UI",system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--text)}
+#app{display:flex;height:100vh;overflow:hidden}
+
+/* Seitenleiste */
+#side{width:270px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;transition:margin .2s}
+#side.hidden{margin-left:-270px}
+.brand{display:flex;align-items:center;gap:10px;padding:16px 16px 10px;font-weight:600;font-size:16px}
+.brand img{width:24px;height:24px}
+.side-btn{margin:4px 12px;padding:9px 12px;border:1px solid var(--line);background:var(--surf);border-radius:10px;display:flex;align-items:center;gap:8px;text-align:left}
+.side-btn:hover{border-color:var(--accent)}
+#search{margin:8px 12px;padding:8px 11px;border-radius:9px;border:1px solid var(--line);background:transparent;outline:none}
+#search:focus{border-color:var(--accent)}
+#chatlist{flex:1;overflow-y:auto;padding:4px 8px 12px}
+.grp{font-size:12px;color:var(--muted);padding:12px 8px 4px;font-weight:600}
+.ci{display:flex;align-items:center;gap:4px;padding:7px 9px;border-radius:8px;cursor:pointer;color:var(--text);font-size:14px}
+.ci:hover{background:var(--surf2)}
+.ci.active{background:var(--surf2);box-shadow:inset 3px 0 0 var(--accent)}
+.ci .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci .a{display:none;gap:2px}
+.ci:hover .a,.ci.active .a{display:flex}
+.ib{background:none;border:none;padding:3px 5px;border-radius:6px;color:var(--muted);line-height:1}
+.ib:hover{background:var(--line);color:var(--text)}
+.side-foot{border-top:1px solid var(--line);padding:8px 12px;display:flex;gap:6px}
+.side-foot button{flex:1}
+
+/* Hauptbereich */
+#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#top{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+#model{background:var(--surf);border:1px solid var(--line);border-radius:9px;padding:6px 10px;outline:none;max-width:260px}
+.badge{font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surf2);color:var(--muted);border:1px solid var(--line)}
+#status{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-left:auto}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:#5cb85c}.dot.bad{background:var(--err)}
+#scroll{flex:1;overflow-y:auto}
+#msgs{max-width:780px;margin:0 auto;padding:24px 20px 40px}
+.msg{margin:18px 0;position:relative}
+.msg.user{display:flex;flex-direction:column;align-items:flex-end}
+.msg.user .bubble{background:var(--user);padding:10px 15px;border-radius:16px;max-width:85%;white-space:pre-wrap;word-wrap:break-word}
+.msg.assistant .body{word-wrap:break-word}
+.msg .acts{display:flex;gap:2px;margin-top:4px;opacity:0;transition:opacity .15s}
+.msg:hover .acts,.msg:last-child .acts{opacity:1}
+.msg .meta{font-size:12px;color:var(--muted);margin-left:6px;align-self:center}
+.att{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;justify-content:flex-end}
+.att img{max-width:180px;max-height:140px;border-radius:10px;border:1px solid var(--line);cursor:zoom-in}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--line);border-radius:9px;padding:4px 9px;font-size:13px}
+.err{color:var(--err);border:1px solid var(--err);border-radius:10px;padding:8px 12px;margin-top:8px;font-size:14px}
+.stopped{color:var(--muted);font-size:13px;font-style:italic}
+details.think{border:1px solid var(--line);border-radius:10px;margin:4px 0 10px;background:var(--surf)}
+details.think summary{cursor:pointer;padding:6px 12px;color:var(--muted);font-size:13px;user-select:none}
+details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-space:pre-wrap;max-height:320px;overflow:auto}
+.cursor::after{content:"▍";color:var(--accent);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* Markdown */
+.body p{margin:.55em 0}.body h1,.body h2,.body h3,.body h4{margin:1em 0 .4em;line-height:1.3}
+.body h1{font-size:1.45em}.body h2{font-size:1.25em}.body h3{font-size:1.1em}
+.body ul,.body ol{padding-left:1.5em;margin:.5em 0}.body li{margin:.2em 0}
+.body a{color:var(--accent)}
+.body blockquote{border-left:3px solid var(--accent);margin:.6em 0;padding:.1em 1em;color:var(--muted)}
+.body hr{border:none;border-top:1px solid var(--line);margin:1.2em 0}
+.body code{background:var(--code);padding:.1em .35em;border-radius:5px;font:13.5px Consolas,"Cascadia Code",monospace}
+.code{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:.8em 0;background:var(--code)}
+.code-h{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 4px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.code-h button{background:none;border:none;color:var(--muted);font-size:12px;padding:3px 8px;border-radius:6px}
+.code-h button:hover{background:var(--line);color:var(--text)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto}
+.code pre code{background:none;padding:0;font-size:13.5px;line-height:1.5}
+.tbl{overflow-x:auto;margin:.8em 0}
+.body table{border-collapse:collapse;font-size:14px}
+.body th,.body td{border:1px solid var(--line);padding:6px 10px}
+.body th{background:var(--surf2)}
+.kw{color:#c98bdb}.str{color:#9ccf7a}.num{color:#e6a85c}.com{color:var(--muted);font-style:italic}
+:root.light .kw{color:#8a3fa8}:root.light .str{color:#3f7d1f}:root.light .num{color:#b0601a}
+
+/* Leerer Zustand */
+#empty{display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:20px}
+#empty h1{font-weight:500;font-size:30px;margin:0 0 6px;display:flex;align-items:center;gap:12px}
+#empty h1 img{width:36px}
+#empty p{color:var(--muted);margin:0 0 24px}
+.main-empty #scroll{display:none}.main-empty #empty{display:flex}
+.main-empty #empty{flex:none;margin-top:auto}
+.main-empty #composerWrap{margin-bottom:auto;padding-bottom:12vh}
+
+/* Eingabe */
+#composerWrap{padding:0 20px 18px}
+#composer{max-width:780px;margin:0 auto;background:var(--surf);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:10px 12px 8px}
+#composer:focus-within{border-color:var(--accent)}
+#pending{display:flex;flex-wrap:wrap;gap:6px}
+#pending:not(:empty){margin-bottom:8px}
+#pending img{height:52px;border-radius:8px;border:1px solid var(--line)}
+.pitem{position:relative;display:inline-flex}
+.pitem .x{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;border:none;background:var(--muted);color:var(--bg);font-size:11px;line-height:18px;padding:0}
+#input{width:100%;border:none;outline:none;background:transparent;resize:none;max-height:40vh;min-height:26px;padding:4px 2px}
+.crow{display:flex;align-items:center;gap:6px;margin-top:4px}
+.crow .sp{flex:1}
+#send{width:36px;height:36px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center}
+#send:hover{background:var(--accent2)}
+#send:disabled{opacity:.4;cursor:default}
+.hint{text-align:center;color:var(--muted);font-size:12px;margin-top:8px}
+#drop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;color:#fff;font-size:22px;border:3px dashed var(--accent)}
+
+/* Dialog */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:60}
+.modal.open{display:flex}
+.dlg{background:var(--bg);border:1px solid var(--line);border-radius:14px;width:min(560px,94vw);max-height:90vh;overflow:auto;padding:20px 22px;box-shadow:var(--shadow)}
+.dlg h2{margin:0 0 14px;font-size:19px}
+.fld{margin:12px 0}
+.fld label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.fld input[type=text],.fld textarea,.fld select{width:100%;background:var(--surf);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:none}
+.fld textarea{min-height:110px;resize:vertical}
+.row2{display:flex;gap:12px}.row2>.fld{flex:1}
+.btn{padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surf)}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{color:var(--err)}
+.dlg .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:70;cursor:zoom-out}
+#lightbox img{max-width:92vw;max-height:92vh}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surf2);border:1px solid var(--line);padding:8px 16px;border-radius:10px;display:none;z-index:80}
+.editbox textarea{width:100%;min-height:80px;background:var(--surf);border:1px solid var(--accent);border-radius:12px;padding:10px;outline:none;resize:vertical}
+.editbox{width:85%}
+.editbox .foot{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="brand"><img src="icon.svg" alt="">Lokal-Chat</div>
+    <button class="side-btn" id="newChat">＋ Neuer Chat</button>
+    <input id="search" placeholder="Chats durchsuchen …">
+    <div id="chatlist"></div>
+    <div class="side-foot">
+      <button class="btn" id="openSettings">⚙ Einstellungen</button>
+    </div>
+  </aside>
+  <main id="main">
+    <div id="top">
+      <button class="ib" id="toggleSide" title="Seitenleiste">☰</button>
+      <select id="model" title="Modell"></select>
+      <span id="caps"></span>
+      <div id="status"><span class="dot" id="dot"></span><span id="statusText">Verbinde …</span></div>
+      <button class="ib" id="exportChat" title="Chat als Markdown exportieren">⇩</button>
+    </div>
+    <div id="scroll"><div id="msgs"></div></div>
+    <div id="empty">
+      <h1><img src="icon.svg" alt="">Wie kann ich helfen?</h1>
+      <p id="emptySub">Läuft komplett lokal über Ollama.</p>
+    </div>
+    <div id="composerWrap">
+      <div id="composer">
+        <div id="pending"></div>
+        <textarea id="input" rows="1" placeholder="Schreib eine Nachricht …"></textarea>
+        <div class="crow">
+          <button class="ib" id="attach" title="Datei oder Bild anhängen">📎</button>
+          <select id="thinkSel" class="badge" title="Denkmodus" style="display:none">
+            <option value="auto">Denken: Auto</option><option value="on">Denken: An</option><option value="off">Denken: Aus</option>
+          </select>
+          <span class="sp"></span>
+          <button id="send" title="Senden (Enter)">↑</button>
+        </div>
+      </div>
+      <div class="hint">Enter senden · Umschalt+Enter neue Zeile · Dateien hineinziehen oder einfügen</div>
+    </div>
+  </main>
+</div>
+<input type="file" id="file" multiple hidden>
+<div id="drop">Dateien hier ablegen</div>
+<div id="lightbox"><img alt=""></div>
+<div id="toast"></div>
+
+<div class="modal" id="settings">
+  <div class="dlg">
+    <h2>Einstellungen</h2>
+    <div class="fld"><label>Ollama-Adresse</label><input type="text" id="sUrl"></div>
+    <div class="fld"><label>Eigene Anweisungen (System-Prompt für alle Chats)</label>
+      <textarea id="sSystem" placeholder="z. B. Antworte auf Deutsch, knapp und präzise. Ich arbeite viel mit Rust-Plugins (Oxide/Carbon)."></textarea></div>
+    <div class="row2">
+      <div class="fld"><label>Temperatur: <span id="sTempV"></span></label><input type="range" id="sTemp" min="0" max="2" step="0.05" style="width:100%"></div>
+      <div class="fld"><label>Kontextlänge (Tokens)</label>
+        <select id="sCtx"><option>2048</option><option>4096</option><option>8192</option><option>16384</option><option>32768</option><option>65536</option><option>131072</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="fld"><label>Design</label>
+        <select id="sTheme"><option value="dark">Dunkel</option><option value="light">Hell</option><option value="system">Wie Windows</option></select></div>
+      <div class="fld"><label>Modell im Speicher halten</label>
+        <select id="sKeep"><option value="5m">5 Minuten</option><option value="30m">30 Minuten</option><option value="2h">2 Stunden</option><option value="-1">Immer</option></select></div>
+    </div>
+    <div class="fld"><label><input type="checkbox" id="sDate"> Aktuelles Datum und Uhrzeit mitschicken</label></div>
+    <div class="foot">
+      <button class="btn" id="exportAll">Alle Chats sichern</button>
+      <button class="btn" id="importAll">Sicherung laden</button>
+      <button class="btn danger" id="wipe">Alle Chats löschen</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="sCancel">Abbrechen</button>
+      <button class="btn pri" id="sSave">Speichern</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="importFile" accept=".json" hidden>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:8192, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false};
+let S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('lc_settings') || '{}'));
+const saveS = () => localStorage.setItem('lc_settings', JSON.stringify(S));
+const base = () => S.url.replace(/\/+$/, '');
+
+let chats = [], cur = null, pending = [], abortCtl = null, caps = [];
+
+/* ---------- Speicher (IndexedDB) ---------- */
+let db;
+function openDB(){ return new Promise((res, rej) => {
+  const r = indexedDB.open('lokalchat', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('chats', {keyPath:'id'});
+  r.onsuccess = () => { db = r.result; res(); };
+  r.onerror = () => rej(r.error);
+});}
+const tx = (mode) => db.transaction('chats', mode).objectStore('chats');
+const dbAll = () => new Promise(res => { const r = tx('readonly').getAll(); r.onsuccess = () => res(r.result || []); });
+const dbPut = c => new Promise(res => { const r = tx('readwrite').put(c); r.onsuccess = () => res(); });
+const dbDel = id => new Promise(res => { const r = tx('readwrite').delete(id); r.onsuccess = () => res(); });
+
+/* ---------- Hilfen ---------- */
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+function toast(t){ const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = 'none', 2200); }
+function applyTheme(){
+  const dark = S.theme === 'dark' || (S.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('light', !dark);
+}
+
+/* ---------- Markdown ---------- */
+const KW = /\b(function|return|if|else|for|while|do|switch|case|break|continue|const|let|var|class|new|this|import|from|export|default|async|await|try|catch|finally|throw|public|private|protected|static|void|int|float|double|bool|boolean|string|char|long|using|namespace|def|elif|lambda|None|True|False|true|false|null|undefined|fn|mut|impl|struct|enum|pub|use|match|select|insert|update|delete|where|join|into|values|create|table|and|or|not|in|is|as|with|override|virtual|readonly|foreach|object|echo|then|fi|end|local)\b/g;
+function highlight(code, lang){
+  if (/^(text|txt|plain|log|output)?$/i.test(lang) && !/[{};=]/.test(code)) return esc(code);
+  const toks = [];
+  const enc = n => '\u0001' + String(n).split('').map(d => String.fromCharCode(0xE000 + +d)).join('') + '\u0001';
+  const keep = (cls, s) => { toks.push(`<span class="${cls}">${esc(s)}</span>`); return enc(toks.length - 1); };
+  let s = code
+    .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|(^|\s)#(?![!{\[])[^\n]*|--[^\n]*/g, m => /^--/.test(m) && !/sql|lua/i.test(lang) ? m : keep('com', m))
+    .replace(/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`/g, m => keep('str', m));
+  s = esc(s).replace(KW, '<span class="kw">$1</span>').replace(/\b(\d+(?:\.\d+)?[fFLu]?)\b/g, '<span class="num">$1</span>');
+  return s.replace(/\u0001([-]+)\u0001/g, (m, d) => toks[+d.split('').map(c => c.charCodeAt(0) - 0xE000).join('')]);
+}
+function codeBlock(code, lang){
+  return `<div class="code"><div class="code-h"><span>${esc(lang || 'code')}</span><button data-copy>Kopieren</button></div><pre><code>${highlight(code, lang)}</code></pre></div>`;
+}
+function inline(s){
+  const codes = [];
+  s = s.replace(/`([^`\n]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length-1) + '\u0000'; });
+  s = esc(s);
+  s = s.replace(/!?\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]*[^\s<).,;:!?])/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>').replace(/(^|\W)__([^_\n]+)__(?=\W|$)/g, '$1<strong>$2</strong>');
+  s = s.replace(/(^|[^*\w])\*([^*\s][^*\n]*?)\*(?!\*)/g, '$1<em>$2</em>').replace(/(^|\W)_([^_\n]+)_(?=\W|$)/g, '$1<em>$2</em>');
+  s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+  return s.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + esc(codes[i]) + '</code>');
+}
+const RE_LI = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+const isBlockStart = l => /^\s*```/.test(l) || /^#{1,6}\s/.test(l) || /^\s*>/.test(l) || RE_LI.test(l) || /^\s*\|.*\|\s*$/.test(l) || /^\s*([-*_])(\s*\1){2,}\s*$/.test(l);
+function parseList(lines, i, baseInd){
+  const ordered = /^\s*\d+[.)]\s/.test(lines[i]);
+  const startNum = ordered ? parseInt(lines[i]) || 1 : 1;
+  let html = ordered ? `<ol${startNum !== 1 ? ` start="${startNum}"` : ''}>` : '<ul>';
+  while (i < lines.length){
+    const m = lines[i].match(RE_LI);
+    if (!m){
+      if (/^\s+\S/.test(lines[i]) && /<\/li>$/.test(html)){ html = html.replace(/<\/li>$/, '<br>' + inline(lines[i].trim()) + '</li>'); i++; continue; }
+      break;
+    }
+    const ind = m[1].replace(/\t/g, '    ').length;
+    if (ind < baseInd) break;
+    if (ind > baseInd){
+      const r = parseList(lines, i, ind);
+      html = /<\/li>$/.test(html) ? html.replace(/<\/li>$/, r.html + '</li>') : html + r.html;
+      i = r.i; continue;
+    }
+    if (ordered !== /\d/.test(m[2])) break;
+    const task = m[3].match(/^\[([ xX])\]\s+(.*)/);
+    html += '<li>' + (task ? `<input type="checkbox" disabled${task[1] !== ' ' ? ' checked' : ''}> ` + inline(task[2]) : inline(m[3])) + '</li>';
+    i++;
+  }
+  return {html: html + (ordered ? '</ol>' : '</ul>'), i};
+}
+function md(src){
+  const out = [], lines = String(src).replace(/\r/g, '').split('\n');
+  let i = 0;
+  while (i < lines.length){
+    const l = lines[i];
+    const f = l.match(/^\s*```\s*([\w#+.-]*)/);
+    if (f){
+      const buf = []; i++;
+      while (i < lines.length && !/^\s*```\s*$/.test(lines[i])){ buf.push(lines[i]); i++; }
+      i++; out.push(codeBlock(buf.join('\n'), f[1])); continue;
+    }
+    if (/^\s*$/.test(l)){ i++; continue; }
+    const h = l.match(/^(#{1,6})\s+(.*)/);
+    if (h){ const n = h[1].length; out.push(`<h${n}>${inline(h[2])}</h${n}>`); i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)){ out.push('<hr>'); i++; continue; }
+    if (/^\s*>/.test(l)){
+      const buf = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])){ buf.push(lines[i].replace(/^\s*>\s?/, '')); i++; }
+      out.push('<blockquote>' + md(buf.join('\n')) + '</blockquote>'); continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i+1])){
+      const row = s => s.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+      const head = row(l);
+      const al = row(lines[i+1]).map(c => c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left');
+      i += 2;
+      let t = '<div class="tbl"><table><thead><tr>' + head.map((c, k) => `<th style="text-align:${al[k] || 'left'}">${inline(c)}</th>`).join('') + '</tr></thead><tbody>';
+      while (i < lines.length && /^\s*\|/.test(lines[i])){
+        t += '<tr>' + row(lines[i]).map((c, k) => `<td style="text-align:${al[k] || 'left'}">${inline(c)}</td>`).join('') + '</tr>'; i++;
+      }
+      out.push(t + '</tbody></table></div>'); continue;
+    }
+    if (RE_LI.test(l)){
+      const r = parseList(lines, i, l.match(RE_LI)[1].replace(/\t/g, '    ').length);
+      out.push(r.html); i = r.i; continue;
+    }
+    const buf = [l]; i++;
+    while (i < lines.length && !/^\s*$/.test(lines[i]) && !isBlockStart(lines[i])){ buf.push(lines[i]); i++; }
+    out.push('<p>' + buf.map(inline).join('<br>') + '</p>');
+  }
+  return out.join('');
+}
+
+/* ---------- Ollama ---------- */
+async function checkOllama(){
+  try {
+    const r = await fetch(base() + '/api/tags');
+    const j = await r.json();
+    const names = (j.models || []).map(m => m.name).sort();
+    const sel = $('#model'); sel.innerHTML = '';
+    if (!names.length){ sel.innerHTML = '<option value="">(keine Modelle)</option>'; }
+    names.forEach(n => sel.add(new Option(n, n)));
+    if (!names.includes(S.model)) S.model = names[0] || '';
+    sel.value = S.model; saveS();
+    let ver = ''; try { ver = (await (await fetch(base() + '/api/version')).json()).version; } catch {}
+    setStatus(true, 'Ollama ' + (ver || 'verbunden'));
+    await loadCaps();
+  } catch (e) {
+    setStatus(false, 'Ollama nicht erreichbar');
+    $('#model').innerHTML = '<option value="">–</option>';
+  }
+}
+function setStatus(ok, t){ $('#dot').className = 'dot ' + (ok ? 'ok' : 'bad'); $('#statusText').textContent = t; }
+async function loadCaps(){
+  caps = [];
+  if (S.model){
+    try {
+      const r = await fetch(base() + '/api/show', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model: S.model})});
+      const j = await r.json(); caps = j.capabilities || [];
+    } catch {}
+  }
+  const label = {vision:'Bilder', thinking:'Denken', tools:'Werkzeuge', completion:null, insert:null, embedding:'Embedding'};
+  $('#caps').innerHTML = caps.map(c => label[c] ? `<span class="badge">${label[c]}</span> ` : '').join('');
+  $('#thinkSel').style.display = caps.includes('thinking') ? '' : 'none';
+  $('#thinkSel').value = S.think;
+  $('#emptySub').textContent = S.model ? `Läuft komplett lokal mit ${S.model}.` : 'Läuft komplett lokal über Ollama.';
+}
+async function streamChat(body, onChunk, signal){
+  const res = await fetch(base() + '/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), signal});
+  if (!res.ok){ const t = await res.text(); let m = t; try { m = JSON.parse(t).error || t; } catch {} throw new Error(m || ('HTTP ' + res.status)); }
+  const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+  for (;;){
+    const {done, value} = await reader.read(); if (done) break;
+    buf += dec.decode(value, {stream:true});
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0){
+      const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+      if (!line) continue;
+      const j = JSON.parse(line); if (j.error) throw new Error(j.error);
+      onChunk(j);
+    }
+  }
+  if (buf.trim()) onChunk(JSON.parse(buf));
+}
+
+/* ---------- Chats ---------- */
+function newChat(){ cur = null; pending = []; renderPending(); render(); $('#input').focus(); }
+function selectChat(id){ if (abortCtl) return toast('Bitte erst die laufende Antwort stoppen'); cur = chats.find(c => c.id === id) || null; render(); }
+async function saveChat(c){ c.updated = Date.now(); await dbPut(c); }
+function renderList(){
+  const q = $('#search').value.trim().toLowerCase();
+  const list = chats.filter(c => !q || c.title.toLowerCase().includes(q) || c.messages.some(m => (m.content || '').toLowerCase().includes(q)))
+    .sort((a, b) => b.updated - a.updated);
+  const now = new Date(); const day = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = day(now);
+  const grp = t => t >= today ? 'Heute' : t >= today - 864e5 ? 'Gestern' : t >= today - 7*864e5 ? 'Letzte 7 Tage' : t >= today - 30*864e5 ? 'Letzte 30 Tage' : 'Älter';
+  let html = '', last = '';
+  for (const c of list){
+    const g = grp(c.updated);
+    if (g !== last){ html += `<div class="grp">${g}</div>`; last = g; }
+    html += `<div class="ci${cur && cur.id === c.id ? ' active' : ''}" data-id="${c.id}"><span class="t">${esc(c.title)}</span>
+      <span class="a"><button class="ib" data-ren title="Umbenennen">✎</button><button class="ib" data-del title="Löschen">🗑</button></span></div>`;
+  }
+  $('#chatlist').innerHTML = html || `<div class="grp">${q ? 'Nichts gefunden' : 'Noch keine Chats'}</div>`;
+}
+$('#chatlist').addEventListener('click', async e => {
+  const it = e.target.closest('.ci'); if (!it) return;
+  const c = chats.find(x => x.id === it.dataset.id);
+  if (e.target.closest('[data-del]')){
+    if (!confirm(`„${c.title}“ löschen?`)) return;
+    await dbDel(c.id); chats = chats.filter(x => x !== c); if (cur === c) cur = null; render(); return;
+  }
+  if (e.target.closest('[data-ren]')){
+    const t = prompt('Neuer Name:', c.title); if (t && t.trim()){ c.title = t.trim(); c.titled = true; await dbPut(c); renderList(); } return;
+  }
+  selectChat(c.id);
+});
+
+/* ---------- Nachrichten anzeigen ---------- */
+function msgHTML(m, idx, isLast){
+  if (m.role === 'user'){
+    let att = '';
+    if ((m.images || []).length || (m.files || []).length){
+      att = '<div class="att">' + (m.images || []).map(im => `<img src="data:${im.type};base64,${im.data}" alt="${esc(im.name)}">`).join('')
+        + (m.files || []).map(f => `<span class="chip">📄 ${esc(f.name)}</span>`).join('') + '</div>';
+    }
+    return `<div class="msg user" data-i="${idx}">${att}<div class="bubble">${esc(m.content)}</div>
+      <div class="acts"><button class="ib" data-act="copy" title="Kopieren">⧉</button><button class="ib" data-act="edit" title="Bearbeiten">✎</button></div></div>`;
+  }
+  const streaming = isLast && abortCtl;
+  let think = '';
+  if (m.thinking) think = `<details class="think"${streaming && !m.content ? ' open' : ''}><summary>${streaming && !m.content ? 'Denkt nach …' : 'Gedankengang'}</summary><div class="tb">${esc(m.thinking)}</div></details>`;
+  const body = m.content ? md(m.content) : '';
+  const meta = m.stats ? `<span class="meta">${esc(m.model || '')} · ${m.stats.tokens} Tokens · ${m.stats.tps.toFixed(1)} T/s</span>` : (m.model ? `<span class="meta">${esc(m.model)}</span>` : '');
+  return `<div class="msg assistant" data-i="${idx}">${think}<div class="body${streaming ? ' cursor' : ''}">${body}</div>
+    ${m.stopped ? '<div class="stopped">Abgebrochen</div>' : ''}${m.error ? `<div class="err">⚠ ${esc(m.error)}</div>` : ''}
+    ${streaming ? '' : `<div class="acts"><button class="ib" data-act="copy" title="Kopieren">⧉</button>${isLast ? '<button class="ib" data-act="regen" title="Neu generieren">↻</button>' : ''}${meta}</div>`}</div>`;
+}
+function render(){
+  renderList();
+  const empty = !cur || !cur.messages.length;
+  $('#main').classList.toggle('main-empty', empty);
+  if (empty){ $('#msgs').innerHTML = ''; return; }
+  $('#msgs').innerHTML = cur.messages.map((m, i) => msgHTML(m, i, i === cur.messages.length - 1)).join('');
+}
+const nearBottom = () => { const s = $('#scroll'); return s.scrollHeight - s.scrollTop - s.clientHeight < 120; };
+const toBottom = () => { const s = $('#scroll'); s.scrollTop = s.scrollHeight; };
+let rafPending = false;
+function renderLast(){
+  if (rafPending) return; rafPending = true;
+  requestAnimationFrame(() => {
+    rafPending = false; if (!cur) return;
+    const stick = nearBottom();
+    const i = cur.messages.length - 1, el = $(`#msgs .msg[data-i="${i}"]`);
+    const open = el && el.querySelector('details.think')?.open;
+    const html = msgHTML(cur.messages[i], i, true);
+    if (el) el.outerHTML = html; else $('#msgs').insertAdjacentHTML('beforeend', html);
+    const d = $(`#msgs .msg[data-i="${i}"] details.think`);
+    if (d && open !== undefined && cur.messages[i].content) d.open = open;
+    if (stick) toBottom();
+  });
+}
+$('#msgs').addEventListener('click', async e => {
+  const cp = e.target.closest('[data-copy]');
+  if (cp){ await navigator.clipboard.writeText(cp.closest('.code').querySelector('code').innerText); cp.textContent = 'Kopiert ✓'; setTimeout(() => cp.textContent = 'Kopieren', 1500); return; }
+  const img = e.target.closest('.att img');
+  if (img){ $('#lightbox img').src = img.src; $('#lightbox').style.display = 'flex'; return; }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const el = b.closest('.msg'), i = +el.dataset.i, m = cur.messages[i];
+  if (b.dataset.act === 'copy'){ await navigator.clipboard.writeText(m.content); toast('Kopiert'); }
+  if (b.dataset.act === 'regen'){ if (abortCtl) return; cur.messages.splice(i, 1); render(); generate(); }
+  if (b.dataset.act === 'edit'){
+    if (abortCtl) return;
+    const bub = el.querySelector('.bubble');
+    const box = document.createElement('div'); box.className = 'editbox';
+    box.innerHTML = `<textarea></textarea><div class="foot"><button class="btn" data-x>Abbrechen</button><button class="btn pri" data-ok>Senden</button></div>`;
+    box.querySelector('textarea').value = m.content;
+    bub.replaceWith(box); el.querySelector('.acts').style.display = 'none';
+    box.querySelector('textarea').focus();
+    box.querySelector('[data-x]').onclick = () => render();
+    box.querySelector('[data-ok]').onclick = async () => {
+      m.content = box.querySelector('textarea').value; cur.messages.splice(i + 1); await saveChat(cur); render(); generate();
+    };
+  }
+});
+$('#lightbox').onclick = () => $('#lightbox').style.display = 'none';
+
+/* ---------- Senden & Generieren ---------- */
+function toApi(m){
+  if (m.role === 'user'){
+    let c = m.content;
+    if ((m.files || []).length) c = m.files.map(f => `<datei name="${f.name}">\n${f.text}\n</datei>`).join('\n\n') + '\n\n' + c;
+    const o = {role:'user', content:c};
+    if ((m.images || []).length) o.images = m.images.map(x => x.data);
+    return o;
+  }
+  return {role:'assistant', content:m.content || ''};
+}
+async function send(){
+  if (abortCtl){ abortCtl.abort(); return; }
+  const text = $('#input').value.trim();
+  if (!text && !pending.length) return;
+  if (!S.model) return toast('Kein Modell verfügbar – läuft Ollama?');
+  const images = pending.filter(p => p.kind === 'image'), files = pending.filter(p => p.kind === 'file');
+  if (images.length && !caps.includes('vision')) return toast(`${S.model} kann keine Bilder verarbeiten`);
+  if (!cur){ cur = {id:uid(), title:'Neuer Chat', titled:false, messages:[], created:Date.now(), updated:Date.now()}; chats.push(cur); }
+  cur.messages.push({role:'user', content:text,
+    images: images.map(p => ({name:p.name, type:p.type, data:p.data})),
+    files: files.map(p => ({name:p.name, text:p.text}))});
+  $('#input').value = ''; autosize(); pending = []; renderPending();
+  await saveChat(cur); render(); toBottom();
+  generate();
+}
+async function generate(){
+  const chat = cur;
+  const messages = [];
+  let sys = S.system.trim();
+  if (S.date){ const d = new Date(); sys = `Aktuelles Datum: ${d.toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}, ${d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})} Uhr.` + (sys ? '\n\n' + sys : ''); }
+  if (sys) messages.push({role:'system', content:sys});
+  chat.messages.forEach(m => { if (!m.error || m.content) messages.push(toApi(m)); });
+  const a = {role:'assistant', content:'', thinking:'', model:S.model};
+  chat.messages.push(a);
+  abortCtl = new AbortController(); setBusy(true); render(); toBottom();
+  const body = {model:S.model, messages, stream:true, keep_alive: S.keep === '-1' ? -1 : S.keep, options:{temperature:+S.temp, num_ctx:+S.ctx}};
+  if (caps.includes('thinking') && S.think !== 'auto') body.think = S.think === 'on';
+  try {
+    await streamChat(body, j => {
+      if (j.message){ a.content += j.message.content || ''; a.thinking += j.message.thinking || ''; }
+      if (j.done && j.eval_count) a.stats = {tokens:j.eval_count, tps: j.eval_count / ((j.eval_duration || 1) / 1e9)};
+      if (cur === chat) renderLast();
+    }, abortCtl.signal);
+  } catch (e) {
+    if (e.name === 'AbortError') a.stopped = true;
+    else a.error = /Failed to fetch|NetworkError/.test(e.message) ? 'Ollama ist nicht erreichbar. Läuft Ollama?' : e.message;
+  } finally {
+    a.content = a.content.replace(/^\s+/, '');
+    abortCtl = null; setBusy(false);
+    await saveChat(chat);
+    if (cur === chat) render();
+    if (!chat.titled && !a.error) autoTitle(chat);
+  }
+}
+function setBusy(b){ const s = $('#send'); s.textContent = b ? '■' : '↑'; s.title = b ? 'Stoppen' : 'Senden (Enter)'; }
+async function autoTitle(chat){
+  const first = chat.messages.find(m => m.role === 'user'); if (!first) return;
+  chat.titled = true;
+  chat.title = (first.content || (first.files[0] || first.images[0] || {}).name || 'Neuer Chat').slice(0, 48);
+  await dbPut(chat); renderList();
+  try {
+    const body = {model:S.model, stream:false, keep_alive: S.keep === '-1' ? -1 : S.keep, options:{temperature:0.3, num_predict:30},
+      prompt:`Gib dieser Unterhaltung einen sehr kurzen Titel (2 bis 5 Wörter) in der Sprache der Nachricht. Antworte NUR mit dem Titel, ohne Anführungszeichen.\n\nNachricht:\n${(first.content || '').slice(0, 1200)}`};
+    if (caps.includes('thinking')) body.think = false;
+    const r = await fetch(base() + '/api/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const j = await r.json();
+    let t = (j.response || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim().split('\n')[0].replace(/^(titel|title)\s*:\s*/i, '').replace(/["„“”*#`]/g, '').replace(/[.:]+$/, '').trim();
+    if (t && t.length <= 70){ chat.title = t; await dbPut(chat); renderList(); }
+  } catch {}
+}
+
+/* ---------- Anhänge ---------- */
+function readFile(f){
+  return new Promise(res => {
+    const r = new FileReader();
+    if (f.type.startsWith('image/')){
+      r.onload = () => res({kind:'image', name:f.name || 'Bild.png', type:f.type, data:r.result.split(',')[1]});
+      r.readAsDataURL(f);
+    } else {
+      if (f.size > 3 * 1024 * 1024){ toast(`${f.name} ist zu groß (max. 3 MB Text)`); return res(null); }
+      r.onload = () => {
+        const t = r.result;
+        if (/\u0000/.test(t.slice(0, 4000)) || /^%PDF/.test(t)){ toast(`${f.name}: nur Text- und Bilddateien werden unterstützt`); return res(null); }
+        res({kind:'file', name:f.name, text:t});
+      };
+      r.readAsText(f);
+    }
+  });
+}
+async function addFiles(list){
+  for (const f of list){ const p = await readFile(f); if (p) pending.push(p); }
+  renderPending();
+}
+function renderPending(){
+  $('#pending').innerHTML = pending.map((p, i) => `<span class="pitem">${p.kind === 'image' ? `<img src="data:${p.type};base64,${p.data}" alt="">` : `<span class="chip">📄 ${esc(p.name)}</span>`}<button class="x" data-rm="${i}">✕</button></span>`).join('');
+}
+$('#pending').addEventListener('click', e => { const b = e.target.closest('[data-rm]'); if (b){ pending.splice(+b.dataset.rm, 1); renderPending(); } });
+$('#attach').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+let dragN = 0;
+addEventListener('dragenter', e => { if (e.dataTransfer.types.includes('Files')){ dragN++; $('#drop').style.display = 'flex'; } });
+addEventListener('dragleave', () => { if (--dragN <= 0){ dragN = 0; $('#drop').style.display = 'none'; } });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#drop').style.display = 'none'; addFiles([...e.dataTransfer.files]); });
+$('#input').addEventListener('paste', e => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length){ e.preventDefault(); addFiles(files); }
+});
+
+/* ---------- Eingabe ---------- */
+function autosize(){ const t = $('#input'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, innerHeight * 0.4) + 'px'; }
+$('#input').addEventListener('input', autosize);
+$('#input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); send(); } });
+$('#send').onclick = send;
+$('#newChat').onclick = () => { if (abortCtl) return toast('Bitte erst die laufende Antwort stoppen'); newChat(); };
+$('#search').oninput = renderList;
+$('#model').onchange = async e => { S.model = e.target.value; saveS(); await loadCaps(); };
+$('#thinkSel').onchange = e => { S.think = e.target.value; saveS(); };
+$('#toggleSide').onclick = () => { S.sideHidden = !S.sideHidden; saveS(); $('#side').classList.toggle('hidden', S.sideHidden); };
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && abortCtl) abortCtl.abort();
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'o'){ e.preventDefault(); $('#newChat').click(); }
+});
+
+/* ---------- Export ---------- */
+function download(name, text, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$('#exportChat').onclick = () => {
+  if (!cur) return toast('Kein Chat geöffnet');
+  const t = `# ${cur.title}\n\n` + cur.messages.map(m => `## ${m.role === 'user' ? 'Du' : 'Assistent (' + (m.model || '') + ')'}\n\n` +
+    ((m.files || []).map(f => `📄 ${f.name}\n\n`).join('')) + (m.content || '')).join('\n\n---\n\n');
+  download(cur.title.replace(/[\\/:*?"<>|]/g, '_') + '.md', t, 'text/markdown');
+};
+
+/* ---------- Einstellungen ---------- */
+function openSettings(){
+  $('#sUrl').value = S.url; $('#sSystem').value = S.system; $('#sTemp').value = S.temp; $('#sTempV').textContent = S.temp;
+  $('#sCtx').value = String(S.ctx); $('#sTheme').value = S.theme; $('#sKeep').value = S.keep; $('#sDate').checked = S.date;
+  $('#settings').classList.add('open');
+}
+$('#openSettings').onclick = openSettings;
+$('#sTemp').oninput = e => $('#sTempV').textContent = e.target.value;
+$('#sCancel').onclick = () => $('#settings').classList.remove('open');
+$('#settings').onclick = e => { if (e.target.id === 'settings') $('#settings').classList.remove('open'); };
+$('#sSave').onclick = async () => {
+  const urlChanged = S.url !== $('#sUrl').value.trim();
+  Object.assign(S, {url:$('#sUrl').value.trim() || DEF.url, system:$('#sSystem').value, temp:+$('#sTemp').value, ctx:+$('#sCtx').value,
+    theme:$('#sTheme').value, keep:$('#sKeep').value, date:$('#sDate').checked});
+  saveS(); applyTheme(); $('#settings').classList.remove('open'); toast('Gespeichert');
+  if (urlChanged) checkOllama();
+};
+$('#exportAll').onclick = () => download(`lokalchat-sicherung-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({settings:S, chats}, null, 1), 'application/json');
+$('#importAll').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); let n = 0;
+    for (const c of j.chats || []){ if (c.id && Array.isArray(c.messages)){ await dbPut(c); n++; } }
+    chats = await dbAll(); render(); toast(`${n} Chats geladen`);
+  } catch { toast('Datei konnte nicht gelesen werden'); }
+  e.target.value = '';
+};
+$('#wipe').onclick = async () => {
+  if (!confirm('Wirklich ALLE Chats unwiderruflich löschen?')) return;
+  for (const c of chats) await dbDel(c.id);
+  chats = []; cur = null; render(); $('#settings').classList.remove('open');
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+/* ---------- Start ---------- */
+(async () => {
+  applyTheme();
+  $('#side').classList.toggle('hidden', S.sideHidden);
+  await openDB();
+  chats = await dbAll();
+  render();
+  $('#input').focus();
+  await checkOllama();
+  setInterval(() => { if (!abortCtl) fetch(base() + '/api/version').then(() => { if ($('#dot').classList.contains('bad')) checkOllama(); }).catch(() => setStatus(false, 'Ollama nicht erreichbar')); }, 10000);
+})();
+</script>
+</body>
+</html>

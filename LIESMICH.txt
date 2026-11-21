@@ -1,0 +1,45 @@
+LOKAL-CHAT  -  Chat-App fuer Windows mit deinem lokalen Ollama
+=============================================================
+
+STARTEN
+  1. Ordner "LokalChat" an einen festen Ort entpacken (z. B. C:\Tools\LokalChat).
+  2. Einmalig "Verknuepfung-erstellen.bat" doppelklicken
+     -> "Lokal-Chat" erscheint auf dem Desktop und im Startmenue.
+  3. Ab dann einfach ueber die Verknuepfung starten (oder Start.bat).
+
+  Die App oeffnet sich als eigenes Fenster (ohne Adressleiste). Falls Ollama
+  nicht laeuft, wird es automatisch gestartet. Schliesst du das Fenster,
+  beendet sich auch der kleine Hintergrund-Server.
+
+FUNKTIONEN
+  - Mehrere Chats mit Seitenleiste, Suche, Umbenennen, Loeschen
+  - Automatische Chat-Titel, gruppiert nach Heute / Gestern / ...
+  - Antworten erscheinen live (Streaming), Stoppen mit Knopf oder Esc
+  - Markdown: Code-Bloecke mit Hervorhebung und "Kopieren", Tabellen, Listen
+  - Gedankengang einklappbar (bei Modellen mit Denkmodus, z. B. gemma4)
+  - Bilder anhaengen (bei Modellen mit Bildverstaendnis), Text- und Code-
+    Dateien anhaengen - per Bueroklammer, Hineinziehen oder Strg+V
+  - Nachricht bearbeiten und neu senden, Antwort neu generieren
+  - Modellwahl oben, Faehigkeiten des Modells werden als Plakette angezeigt
+  - Einstellungen: eigene Anweisungen (System-Prompt), Temperatur,
+    Kontextlaenge, Design hell/dunkel, wie lange das Modell geladen bleibt
+  - Export eines Chats als Markdown, Sicherung/Wiederherstellung aller Chats
+  - Tastenkuerzel: Strg+Umschalt+O = neuer Chat
+
+DATEN
+  Alles bleibt auf deinem PC. Die Chats liegen im App-Profil unter
+  %LOCALAPPDATA%\LokalChat\browser-profil. Nichts geht ins Internet.
+
+TECHNIK
+  - LokalChat.ps1: Mini-Webserver auf http://127.0.0.1:8765 (nur lokal)
+  - app\index.html: die komplette Oberflaeche, spricht direkt mit
+    Ollama auf http://127.0.0.1:11434
+  - Fenster ueber Microsoft Edge im App-Modus (Chrome als Ersatz)
+
+PROBLEME?
+  - "Ollama nicht erreichbar": Ollama starten oder in den Einstellungen die
+    Adresse pruefen.
+  - Laeuft Ollama auf einem anderen Rechner, muss dort OLLAMA_ORIGINS
+    passend gesetzt werden.
+  - Port 8765 belegt: in LokalChat.ps1 oben $Port aendern (Achtung: andere
+    Port-Nummer = andere Chat-Ablage).
