@@ -9,15 +9,22 @@ public sealed class Tools
     public GitHubTools GitHub { get; }
     public const int MaxChars = 40000;
 
+    public MemoryTools Memory { get; }
+
     public CommandTools(Config c)
     {
         Files = new FileTools(c);
         GitHub = new GitHubTools(c);
+        Memory = new MemoryTools();
         Commands = new CommandTools();
     }
 
     public Task<string> RunAsync(string name, JsonElement a) => name switch
     {
+        // Gedächtnis
+        "memory_read" => Memory.ReadMemoryAsync(),
+        "memory_write" => Memory.SaveMemoryAsync(S(a, "project"), S(a, "status"), S(a, "completed"), S(a, "active"), S(a, "notes")),
+
         // Dateien
         "list_allowed_folders" => Task.FromResult(Files.ListRoots()),
         "list_dir"      => Task.FromResult(Files.ListDir(S(a, "path"), B(a, "recursive"))),
