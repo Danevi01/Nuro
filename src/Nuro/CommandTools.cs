@@ -7,6 +7,15 @@ namespace Nuro;
 
 public sealed class CommandTools
 {
+using System;
+using System.Diagnostics;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Nuro;
+
+public sealed class CommandTools
+{
     public async Task<string> ExecuteAsync(string command, string? args, string? workingDirectory)
     {
         try
@@ -26,19 +35,19 @@ public sealed class CommandTools
             var output = new StringBuilder();
             var error = new StringBuilder();
 
-            process.OutputDataReceived += (s, e) => { if (e.Data != null) output.AppendLine(e.Data); };
-            process.ErrorDataReceived += (s, e) => { if (e.Data != null) error.AppendLine(e.Data); };
+            process.OutputDataReceived += (s, e) => { if (e.Data != null) output.AppendLine($"[STDOUT] {e.Data}"); };
+            process.ErrorDataReceived += (s, e) => { if (e.Data != null) error.AppendLine($"[STDERR] {e.Data}"); };
 
             process.Start();
             process.BeginOutputRedirection();
             process.BeginErrorRedirection();
 
-            process. WaitForExit();
+            process.WaitForExit();
 
             string result = output.ToString();
             if (process.ExitCode != 0)
             {
-                result += $"\n[ERROR] ExitCode: {process.ExitCode}\n";
+                result += $"\n--- EXIT CODE: {process.ExitCode} ---\n";
                 result += error.ToString();
             }
 
@@ -49,4 +58,5 @@ public sealed class CommandTools
             return $"[EXCEPTION] {ex.Message}";
         }
     }
+}
 }
