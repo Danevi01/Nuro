@@ -8,16 +8,12 @@ namespace Nuro;
 /// </summary>
 public sealed class Tools
 {
-    public FileTools Files { get; } 
-    public ProjectManager ProjectManager { get; } 
-    public WebTools Web { get; } 
-    public GitHubTools GitHub { get; } 
-    public MemoryTools Memory { get; } 
-    public CommandTools Commands { get; }
+    public FileTools Files { get; }
     public GitHubTools GitHub { get; }
     public MemoryTools Memory { get; }
     public CommandTools Commands { get; }
     public WebTools Web { get; }
+    public ProjectManager Projects { get; }
     public const int MaxChars = 40000;
 
     public Tools(Config c)
@@ -27,6 +23,7 @@ public sealed class Tools
         Memory = new MemoryTools(c);
         Commands = new CommandTools(Files);
         Web = new WebTools();
+        Projects = new ProjectManager(c);
     }
 
     public Task<string> RunAsync(string name, JsonElement a) => name switch
@@ -69,6 +66,11 @@ public sealed class Tools
         "memory_list"   => Task.FromResult(Memory.List()),
         "memory_delete" => Task.FromResult(Memory.Forget(S(a, "id"))),
 
+        // Projekte
+        "project_list"   => Task.FromResult(Projects.Describe()),
+        "project_add"    => Task.FromResult(Projects.Add(S(a, "name"), S(a, "description", ""), StrList(a, "folders"))),
+        "project_remove" => Task.FromResult(Projects.Remove(S(a, "id"))),
+
         // Web & System
         "web_fetch"  => Web.FetchAsync(S(a, "url")),
         "gpu_status" => GpuTools.StatusTextAsync(),
@@ -86,6 +88,14 @@ public sealed class Tools
             foreach (var d in del.EnumerateArray())
                 list.Add(new GitHubTools.FileChange(d.ValueKind == JsonValueKind.String ? d.GetString() ?? "" : d.ToString(), null));
         return list;
+    }
+
+    private static List<string> StrList(JsonElement a, string key)
+    {
+        if (!a.TryGetProperty(key, out var v)) return new();
+        if (v.ValueKind == JsonValueKind.Array) return v.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() ?? "" : x.ToString()).Where(x => x.Length > 0).ToList();
+        if (v.ValueKind == JsonValueKind.String) return (v.GetString() ?? "").Split(new[] { ';', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        return new();
     }
 
     public static string Clip(string s) =>

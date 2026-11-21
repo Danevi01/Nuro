@@ -77,6 +77,20 @@ public static class RepoValidator
                         errors.Add($"C#-Syntaxfehler Zeile {line}: {d.GetMessage()} ({d.Id})");
                     }
                     var root = tree.GetCompilationUnitRoot();
+                    // Doppelte Eigenschaften/Felder in derselben Klasse (häufiger Fehler beim Einfügen von Code)
+                    foreach (var type in root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax>())
+                    {
+                        var names = new List<(string name, int line)>();
+                        foreach (var m in type.Members)
+                        {
+                            int ln = m.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                            if (m is Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax pd) names.Add((pd.Identifier.Text, ln));
+                            else if (m is Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax fd)
+                                names.AddRange(fd.Declaration.Variables.Select(v => (v.Identifier.Text, ln)));
+                        }
+                        foreach (var g in names.GroupBy(n => n.name).Where(g => g.Count() > 1))
+                            errors.Add($"„{g.Key}“ ist in {type.Identifier.Text} mehrfach deklariert (Zeilen {string.Join(", ", g.Select(x => x.line))}) – C# erlaubt das nicht (CS0102).");
+                    }
                     var nsCount = root.DescendantNodes().Count(n => n is Microsoft.CodeAnalysis.CSharp.Syntax.BaseNamespaceDeclarationSyntax);
                     if (nsCount > 1) warnings.Add($"Die Datei enthält {nsCount} namespace-Deklarationen – ist Code doppelt eingefügt?");
                     break;

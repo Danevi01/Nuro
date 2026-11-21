@@ -195,6 +195,7 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .chips button{border:1px solid var(--line);background:var(--surf);border-radius:10px;padding:5px 10px;font-size:13px;text-align:left}
 .chips button:hover{border-color:var(--accent)}
+.badge.warnb{color:#d9a441;border-color:#d9a441}
 .chips button .fit{color:#5cb85c}.chips button .nofit{color:#d9a441}
 .bar{height:8px;background:var(--surf2);border-radius:6px;overflow:hidden;margin:8px 0 4px}
 .bar>div{height:100%;width:0;background:var(--accent);transition:width .3s}
@@ -323,7 +324,7 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
     <h2>Modelle</h2>
     <div class="small" id="mmGpu"></div>
     <div id="mmList" style="margin:8px 0 4px"></div>
-    <div style="display:flex;gap:8px;align-items:center;margin:4px 0 8px"><button class="btn" id="mmTest">🔧 Werkzeug-Test für das aktive Modell</button><span class="small" id="mmTestRes" style="flex:1"></span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 8px"><button class="btn" id="mmTest">🔧 Werkzeug-Test</button><button class="btn" id="mmCpu" title="Lädt das aktive Modell nur auf der CPU – zeigt, ob ein Absturz an der Grafikkarte liegt">🖥 Test ohne Grafikkarte</button><span class="small" id="mmTestRes" style="flex-basis:100%"></span></div>
     <div class="sec">
       <h3>Neues Modell herunterladen</h3>
       <div class="small">Name aus der <a href="https://ollama.com/search?c=tools" target="_blank" style="color:var(--accent)">Ollama-Bibliothek</a> eintragen (z. B. <code>gpt-oss:20b</code>) oder einen Vorschlag wählen. Für das selbstständige Arbeiten braucht das Modell die Fähigkeit „Werkzeuge“.</div>
@@ -407,6 +408,10 @@ const TOOLS = [
   fn('gh_issue_create', G + 'Legt ein Issue an.', {title:str('Titel'), body:str('Beschreibung')}, ['title']),
   fn('gh_issue_comment', G + 'Kommentiert ein Issue.', {number:int('Issue-Nummer'), body:str('Kommentar')}, ['number', 'body']),
   fn('gh_issue_close', G + 'Schließt ein Issue.', {number:int('Issue-Nummer')}, ['number']),
+  // Projekte
+  fn('project_list', 'Listet die Projekte des Nutzers mit Beschreibung und zugehörigen lokalen Ordnern.'),
+  fn('project_add', 'Legt ein Projekt an (Name, Beschreibung, zugehörige lokale Ordner).', {name:str('Projektname'), description:str('Kurzbeschreibung'), folders:arr('Vollständige lokale Ordnerpfade', {type:'string'})}, ['name']),
+  fn('project_remove', 'Entfernt ein Projekt aus der Liste (Dateien bleiben erhalten).', {id:str('ID aus project_list')}, ['id']),
   // Web & System
   fn('web_fetch', 'Lädt eine Webseite (http/https) und gibt den Text zurück, z. B. Dokumentation.', {url:str('Vollständige URL')}, ['url']),
   fn('gpu_status', 'Zeigt Auslastung, Grafikspeicher und Temperatur der NVIDIA-Grafikkarte und die geladenen Modelle.'),
@@ -419,7 +424,8 @@ const TOOL_LABEL = {ask_user:'Rückfrage', memory_save:'Merken', memory_search:'
   gh_list:'GitHub: Dateien', gh_read:'GitHub: lesen', gh_branch_start:'GitHub: Branch starten', gh_write:'GitHub: Datei schreiben', gh_edit:'GitHub: ändern',
   gh_commit:'GitHub: Commit', gh_delete:'GitHub: löschen', gh_build_wait:'GitHub: Build abwarten', gh_merge:'GitHub: in main übernehmen', gh_branch_discard:'GitHub: Branch verwerfen',
   gh_commits:'GitHub: Commits', gh_actions:'GitHub: Builds', gh_issues:'GitHub: Issues', gh_issue_read:'GitHub: Issue lesen', gh_issue_create:'GitHub: Issue anlegen',
-  gh_issue_comment:'GitHub: kommentieren', gh_issue_close:'GitHub: Issue schließen', web_fetch:'Webseite laden', gpu_status:'Grafikkarte'};
+  gh_issue_comment:'GitHub: kommentieren', gh_issue_close:'GitHub: Issue schließen', web_fetch:'Webseite laden', gpu_status:'Grafikkarte',
+  project_list:'Projekte ansehen', project_add:'Projekt anlegen', project_remove:'Projekt entfernen'};
 const toolPlace = n => n.startsWith('gh_') ? 'gh' : ['list_dir','read_file','write_file','edit_file','create_folder','delete_path','move_path','search_files','file_info','run_command','list_allowed_folders'].includes(n) ? 'pc' : '';
 
 let MEM = [];   // Langzeitgedächtnis (vom Host)
@@ -644,6 +650,19 @@ async function streamChat(body, onChunk, signal){
     }
   }
   if (buf.trim()) onChunk(JSON.parse(buf));
+}
+
+/* ---------- Ollama-Fehler verständlich machen ---------- */
+function explainOllamaError(msg, model = S.model){
+  const m = String(msg || ''), short = m.length > 160 ? m.slice(0, 160) + '…' : m;
+  if (/model requires more system memory|out of memory|unable to allocate|cudaMalloc failed/i.test(m))
+    return `${model} passt nicht in den Speicher (Grafikspeicher bzw. Arbeitsspeicher). Wähle ein kleineres Modell oder verringere die Kontextlänge in den Einstellungen. – Ollama meldet: ${short}`;
+  if (/(llama-server|llama runner) process has terminated|CUDA error|0xc0000409|shared object initialization/i.test(m))
+    return `Ollama ist beim Laden von ${model} abgestürzt (Fehler im Grafikkarten-Teil von Ollama). Das betrifft nur dieses Modell, nicht Nuro oder deine anderen Modelle. Häufige Ursachen: inoffizielles Community-Modell, Modell größer als der Grafikspeicher, veraltete Ollama- oder NVIDIA-Treiberversion. Lösung: im Modell-Manager ein offizielles Modell wählen und Ollama sowie den NVIDIA-Treiber aktualisieren. – Ollama meldet: ${short}`;
+  if (/does not support tools/i.test(m)) return `${model} unterstützt keine Werkzeuge. Schalte 🔧 aus oder wähle im Modell-Manager ein Modell mit „Werkzeuge“.`;
+  if (/does not support thinking/i.test(m)) return `${model} unterstützt keinen Denkmodus. Stell „Denken“ auf „Auto“.`;
+  if (/model .*not found|try pulling it first/i.test(m)) return `${model} ist nicht installiert. Lade es im Modell-Manager herunter.`;
+  return m;
 }
 
 /* ---------- Chats ---------- */
@@ -1199,7 +1218,7 @@ async function generate(){
     if (!last || last.role !== 'assistant'){ last = {role:'assistant', content:'', model:S.model}; chat.messages.push(last); }
     if (last.role === 'tool') last.running = false;
     if (e.name === 'AbortError') last.stopped = true;
-    else last.error = /Failed to fetch|NetworkError/.test(e.message) ? 'Ollama ist nicht erreichbar. Läuft Ollama?' : e.message;
+    else last.error = /Failed to fetch|NetworkError/.test(e.message) ? 'Ollama ist nicht erreichbar. Läuft Ollama?' : explainOllamaError(e.message);
     a = last;
   } finally {
     chat.messages.forEach(m => {
@@ -1314,9 +1333,9 @@ $('#mText').addEventListener('keydown', e => { if (e.key === 'Enter') addMem(); 
 /* ---------- Modell-Manager ---------- */
 // VRAM-Klassen nach gängigen Empfehlungen (Q4-Quantisierung); "Werkzeuge" laut Ollama-Bibliothek
 const SUGGEST = [
-  {name:'gemma4:12b', vram:16, note:'Bilder, Denken, Werkzeuge'},
+  {name:'gemma4:12b', vram:12, note:'Bilder, Denken, Werkzeuge'},
   {name:'gpt-oss:20b', vram:16, note:'Denken, Werkzeuge – stark beim Planen'},
-  {name:'qwen3.5:9b', vram:16, note:'schnell, Werkzeuge'},
+  {name:'qwen3.5:9b', vram:10, note:'schnell, Werkzeuge'},
   {name:'gemma4:26b', vram:24, note:'Bilder, Denken, Werkzeuge'},
   {name:'qwen3.6:27b', vram:24, note:'stark beim Programmieren mit Werkzeugen'},
   {name:'qwen3-coder:30b', vram:24, note:'spezialisiert aufs Programmieren'},
@@ -1331,9 +1350,14 @@ async function renderModels(){
   let models = [];
   try { models = (await (await fetch(base() + '/api/tags')).json()).models || []; } catch { $('#mmList').innerHTML = '<div class="err">Ollama ist nicht erreichbar.</div>'; return; }
   const vram = lastGpu ? lastGpu.memTotalMb / 1024 : null;
-  $('#mmGpu').textContent = lastGpu ? `Grafikkarte: ${lastGpu.name} mit ${vram.toFixed(0)} GB Grafikspeicher. Modelle, die nicht ganz hineinpassen, laufen teilweise auf der CPU und deutlich langsamer.` : '';
+  let ver = ''; try { ver = (await (await fetch(base() + '/api/version')).json()).version; } catch {}
+  $('#mmGpu').innerHTML = (lastGpu ? `Grafikkarte: ${esc(lastGpu.name)} mit ${vram.toFixed(0)} GB Grafikspeicher (Treiber ${esc(lastGpu.driver || '?')}). Modelle, die nicht ganz hineinpassen, laufen teilweise auf der CPU und deutlich langsamer. ` : '')
+    + (ver ? `Ollama ${esc(ver)} – <a href="https://ollama.com/download/windows" target="_blank" style="color:var(--accent)">aktuelle Version</a>.` : '');
   $('#mmList').innerHTML = models.length ? models.sort((a, b) => a.name.localeCompare(b.name)).map(m => `<div class="mrow${m.name === S.model ? ' active' : ''}" data-m="${esc(m.name)}">
-      <span class="nm">${esc(m.name)}</span><span class="sz">${m.size ? gb(m.size) : ''}</span><span class="caps" data-caps="${esc(m.name)}"></span><span class="sp"></span>
+      <span class="nm">${esc(m.name)}</span><span class="sz">${m.size ? gb(m.size) : ''}</span><span class="caps" data-caps="${esc(m.name)}"></span>
+      ${m.name.includes('/') ? '<span class="badge" title="Kein offizielles Ollama-Modell, sondern von einem Nutzer hochgeladen. Solche Modelle sind häufiger fehlerhaft.">Community</span>' : ''}
+      ${vram && m.size > vram * 1.074e9 * 0.92 ? '<span class="badge warnb" title="Größer als dein Grafikspeicher – läuft teilweise auf der CPU (langsam) und kann beim Laden abstürzen.">⚠ größer als VRAM</span>' : ''}
+      <span class="sp"></span>
       ${m.name === S.model ? '<span class="small">aktiv</span>' : `<button class="btn" data-use="${esc(m.name)}">Verwenden</button>`}
       <button class="ib" data-delm="${esc(m.name)}" title="Löschen">🗑</button></div>`).join('')
     : '<div class="small">Noch keine Modelle installiert.</div>';
@@ -1375,6 +1399,7 @@ $('#mmPull').onclick = async () => {
   const name = $('#mmName').value.trim().replace(/^ollama\s+(pull|run)\s+/i, '');
   if (!name || pullCtl) return;
   if (!/^[\w.\-/]+(:[\w.\-]+)?$/.test(name)) return toast('Ungültiger Modellname');
+  if (/cloud/i.test(name) && !confirm(`„${name}“ ist ein Cloud-Modell: Es läuft nicht auf deinem PC, sondern bei Ollama, braucht ein Ollama-Konto und kann Kosten verursachen. Trotzdem fortfahren?`)) return;
   pullCtl = new AbortController();
   $('#mmProg').style.display = ''; $('#mmBar').style.width = '0'; $('#mmPull').disabled = true;
   const parts = {}; let lastT = Date.now(), lastDone = 0, speed = 0, ok = false;
@@ -1407,7 +1432,7 @@ $('#mmPull').onclick = async () => {
     await useModel(name);
     $('#mmName').value = '';
   } catch (e) {
-    $('#mmStat').textContent = e.name === 'AbortError' ? 'Abgebrochen (bereits geladene Teile bleiben erhalten und werden beim nächsten Mal fortgesetzt).' : 'Fehler: ' + e.message;
+    $('#mmStat').textContent = e.name === 'AbortError' ? 'Abgebrochen (bereits geladene Teile bleiben erhalten und werden beim nächsten Mal fortgesetzt).' : 'Fehler: ' + explainOllamaError(e.message, name);
   } finally {
     pullCtl = null; $('#mmPull').disabled = false;
   }
@@ -1430,7 +1455,22 @@ $('#mmTest').onclick = async () => {
     else { out.className = 'small bad-t'; out.textContent = `✗ ${S.model} hat kein Werkzeug benutzt. Antwort: „${text.slice(0, 120)}“`; }
   } catch (e) {
     out.className = 'small bad-t';
-    out.textContent = /does not support tools/i.test(e.message) ? `✗ ${S.model} unterstützt keine Werkzeuge.` : 'Fehler: ' + e.message;
+    out.textContent = '✗ ' + explainOllamaError(e.message);
+  }
+};
+$('#mmCpu').onclick = async () => {
+  const out = $('#mmTestRes');
+  out.className = 'small'; out.textContent = `Lade ${S.model} nur auf der CPU (das kann etwas dauern) …`;
+  try {
+    const r = await fetch(base() + '/api/generate', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:S.model, prompt:'Antworte nur mit: OK', stream:false, keep_alive:0, options:{num_gpu:0, num_predict:8, num_ctx:2048}, ...(caps.includes('thinking') ? {think:false} : {})})});
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    out.className = 'small ok-t';
+    out.textContent = `✓ Auf der CPU läuft ${S.model}. Stürzt es mit Grafikkarte ab, liegt es an Grafikspeicher, Treiber oder Ollama-Version – nicht an Nuro.`;
+  } catch (e) {
+    out.className = 'small bad-t';
+    out.textContent = `✗ Auch ohne Grafikkarte fehlerhaft – die Modelldatei selbst ist vermutlich defekt oder mit deiner Ollama-Version nicht kompatibel. Am besten löschen und ein offizielles Modell nehmen. (${String(e.message).slice(0, 140)})`;
   }
 };
 $('#mmClose').onclick = () => $('#modelModal').classList.remove('open');
