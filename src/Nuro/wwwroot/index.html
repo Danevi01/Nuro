@@ -323,6 +323,7 @@ details.toolcard pre{margin:0;background:var(--code);border-radius:8px;padding:8
     <h2>Modelle</h2>
     <div class="small" id="mmGpu"></div>
     <div id="mmList" style="margin:8px 0 4px"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin:4px 0 8px"><button class="btn" id="mmTest">🔧 Werkzeug-Test für das aktive Modell</button><span class="small" id="mmTestRes" style="flex:1"></span></div>
     <div class="sec">
       <h3>Neues Modell herunterladen</h3>
       <div class="small">Name aus der <a href="https://ollama.com/search?c=tools" target="_blank" style="color:var(--accent)">Ollama-Bibliothek</a> eintragen (z. B. <code>gpt-oss:20b</code>) oder einen Vorschlag wählen. Für das selbstständige Arbeiten braucht das Modell die Fähigkeit „Werkzeuge“.</div>
@@ -442,6 +443,7 @@ function toolSystemPrompt(){
   const folders = HS.folders.length ? HS.folders.join(', ') : '(noch keine – bitte den Nutzer, in den Einstellungen einen Ordner freizugeben)';
   return `Du bist Nuro, ein KI-Assistent, der lokal auf dem Windows-PC des Nutzers läuft (Modell ${S.model} über Ollama auf der NVIDIA-Grafikkarte).
 Du hast Werkzeuge und arbeitest selbstständig: Plane kurz, rufe Werkzeuge auf, prüfe die Ergebnisse und mach weiter, bis die Aufgabe erledigt ist. Erfinde keine Dateiinhalte – lies sie.
+WICHTIG: Werkzeuge rufst du ausschließlich über die Funktionsaufruf-Schnittstelle auf. Schreibe Werkzeugaufrufe nie als Text (kein „Aktion: …“, kein JSON im Text) – nur echte Aufrufe werden ausgeführt. Behaupte nie, etwas getan zu haben, ohne dass ein Werkzeug-Ergebnis es bestätigt.
 
 ## Zwei getrennte Welten: LOKAL und GITHUB
 1. LOKAL = Dateien auf dem PC des Nutzers. Werkzeuge: list_dir, read_file, write_file, edit_file, search_files, run_command … Immer vollständige Windows-Pfade (z. B. C:\\Projekte\\x.cs). Zugriff nur in: ${folders}.
@@ -679,6 +681,7 @@ $('#chatlist').addEventListener('click', async e => {
 
 /* ---------- Nachrichten anzeigen ---------- */
 function msgHTML(m, idx, isLast){
+  if (m.role === 'user' && m.hidden) return `<div class="msg" data-i="${idx}" style="display:none"></div>`;
   if (m.role === 'user'){
     let att = '';
     if ((m.images || []).length || (m.files || []).length){
@@ -759,7 +762,7 @@ $('#msgs').addEventListener('click', async e => {
   if (b.dataset.act === 'copy'){ await navigator.clipboard.writeText(m.content); toast('Kopiert'); }
   if (b.dataset.act === 'regen'){
     if (abortCtl) return;
-    let u = i; while (u >= 0 && cur.messages[u].role !== 'user') u--;
+    let u = i; while (u >= 0 && (cur.messages[u].role !== 'user' || cur.messages[u].hidden)) u--;
     cur.messages.splice(u + 1); await saveChat(cur); render(); generate();
   }
   if (b.dataset.act === 'edit'){
@@ -812,7 +815,7 @@ function toApi(m){
   }
   if (m.role === 'tool') return {role:'tool', tool_name:m.tool_name, content:m.content || ''};
   const o = {role:'assistant', content:m.content || ''};
-  if ((m.tool_calls || []).length) o.tool_calls = m.tool_calls;
+  if ((m.tool_calls || []).length) o.tool_calls = m.tool_calls.map(c => ({function:{name:c.function.name, arguments:c.function.arguments}}));
   return o;
 }
 async function send(){
@@ -888,7 +891,7 @@ function chatSearch(q, current){
     const title = c.title.toLowerCase();
     words.forEach(w => { if (title.includes(w)) score += 3; });
     for (const m of c.messages){
-      if ((m.role !== 'user' && m.role !== 'assistant') || !m.content) continue;
+      if ((m.role !== 'user' && m.role !== 'assistant') || !m.content || m.hidden) continue;
       const tl = m.content.toLowerCase();
       const found = words.filter(w => tl.includes(w));
       if (!found.length) continue;
@@ -906,7 +909,7 @@ function chatRead(id){
   if (!c) throw new Error('Chat nicht gefunden. Verwende eine ID aus chat_search.');
   let out = `Chat „${c.title}“ vom ${new Date(c.created || c.updated).toLocaleString('de-DE')}\n\n`;
   for (const m of c.messages){
-    if (m.role === 'user') out += `Nutzer: ${m.content}\n\n`;
+    if (m.role === 'user' && !m.hidden) out += `Nutzer: ${m.content}\n\n`;
     else if (m.role === 'assistant' && m.content) out += `Nuro: ${m.content}\n\n`;
     else if (m.role === 'tool') out += `(Werkzeug ${m.tool_name}${m.ok ? ' ✓' : ' ✗'})\n`;
   }
@@ -934,11 +937,133 @@ async function execTool(name, args, t, chat){
   return host('/api/tool', {name, args});
 }
 
+/* ---------- Werkzeug-Aufrufe, die das Modell nur als Text geschrieben hat ---------- */
+const TOOL_BY_NAME = Object.fromEntries(TOOLS.map(t => [t.function.name, t.function]));
+const PARAM_ALIAS = {pfad:'path', datei:'path', dateipfad:'path', file:'path', filepath:'path', file_path:'path', ordner:'path', folder:'path',
+  inhalt:'content', text:'content', code:'content', nachricht:'message', commit:'message', befehl:'command', cmd:'command',
+  arbeitsordner:'working_directory', cwd:'working_directory', von:'from', nach:'to', frage:'question', optionen:'options', suche:'query'};
+function validCall(name, args){
+  const f = TOOL_BY_NAME[name];
+  if (!f || !args || typeof args !== 'object' || Array.isArray(args)) return false;
+  return (f.parameters.required || []).every(k => args[k] !== undefined && args[k] !== null && args[k] !== '');
+}
+function normArgs(name, args){
+  const props = TOOL_BY_NAME[name]?.parameters.properties || {}, out = {};
+  for (const [k, v] of Object.entries(args || {})){
+    const key = props[k] ? k : (PARAM_ALIAS[k.toLowerCase()] || k);
+    out[key] = v;
+  }
+  return out;
+}
+const TQ = '"'.repeat(3), TQ1 = "'".repeat(3);
+function parseKwargs(s){
+  const out = {}; let i = 0;
+  const ws = () => { while (i < s.length && /[\s,]/.test(s[i])) i++; };
+  while (i < s.length){
+    ws();
+    const km = /^([A-Za-z_]\w*)\s*[=:]\s*/.exec(s.slice(i));
+    if (!km) break;
+    const key = km[1]; i += km[0].length;
+    let val;
+    const triple = s.slice(i, i + 3);
+    if (triple === TQ || triple === TQ1){
+      const end = s.indexOf(triple, i + 3); if (end < 0) break;
+      val = s.slice(i + 3, end); i = end + 3;
+    } else if (s[i] === '"' || s[i] === "'"){
+      const q = s[i]; let j = i + 1, buf = '';
+      while (j < s.length && s[j] !== q){
+        if (s[j] === '\\' && j + 1 < s.length){ const n = s[j + 1]; buf += n === 'n' ? '\n' : n === 't' ? '\t' : n; j += 2; }
+        else buf += s[j++];
+      }
+      val = buf; i = j + 1;
+    } else if (s[i] === '[' || s[i] === '{'){
+      let depth = 0, j = i;
+      for (; j < s.length; j++){ if ('[{'.includes(s[j])) depth++; else if (']}'.includes(s[j]) && --depth === 0) break; }
+      const raw = s.slice(i, j + 1); i = j + 1;
+      try { val = JSON.parse(raw.replace(/'/g, '"')); } catch { val = raw; }
+    } else {
+      const m = /^[^,\n)]*/.exec(s.slice(i)); i += m[0].length;
+      const r = m[0].trim();
+      val = r === 'True' || r === 'true' ? true : r === 'False' || r === 'false' ? false : /^-?\d+(\.\d+)?$/.test(r) ? +r : r;
+    }
+    out[key] = val;
+  }
+  return out;
+}
+function jsonObjects(text){
+  const res = [];
+  for (let i = 0; i < text.length && res.length < 20; i++){
+    if (text[i] !== '{') continue;
+    let depth = 0, inStr = false, esc2 = false;
+    for (let j = i; j < text.length; j++){
+      const c = text[j];
+      if (inStr){ if (esc2) esc2 = false; else if (c === '\\') esc2 = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0){
+        try { res.push(JSON.parse(text.slice(i, j + 1))); i = j; } catch {}
+        break;
+      }
+    }
+  }
+  return res;
+}
+function parseTextToolCalls(text){
+  if (!text) return [];
+  const out = [], seen = new Set();
+  const add = (name, args) => {
+    name = String(name || '').trim().replace(/^functions?\./, '');
+    if (typeof args === 'string'){ try { args = JSON.parse(args); } catch { args = null; } }
+    args = normArgs(name, args);
+    if (!validCall(name, args)) return;
+    const key = name + JSON.stringify(args);
+    if (!seen.has(key)){ seen.add(key); out.push({function:{name, arguments:args}, fromText:true}); }
+  };
+  // a) JSON: {"name": "...", "arguments": {...}} in den üblichen Varianten
+  for (const o of jsonObjects(text)){
+    for (const x of Array.isArray(o.tool_calls) ? o.tool_calls : [o]){
+      const f = x.function || x;
+      add(f.name || f.tool || f.tool_name || f.action, f.arguments || f.parameters || f.args || f.input);
+    }
+  }
+  // b) Funktionsstil: write_file(path="…", content="…")
+  const names = Object.keys(TOOL_BY_NAME).join('|');
+  for (const m of text.matchAll(new RegExp(`\\b(${names})\\s*\\(`, 'g'))){
+    let depth = 0, j = m.index + m[0].length - 1, inQ = null;
+    for (; j < text.length; j++){
+      const c = text[j];
+      if (inQ){ if (text.startsWith(inQ, j)){ j += inQ.length - 1; inQ = null; } else if (c === '\\') j++; continue; }
+      if (text.startsWith(TQ, j) || text.startsWith(TQ1, j)){ inQ = text.slice(j, j + 3); j += 2; continue; }
+      if (c === '"' || c === "'"){ inQ = c; continue; }
+      if (c === '(') depth++;
+      else if (c === ')' && --depth === 0) break;
+    }
+    add(m[1], parseKwargs(text.slice(m.index + m[0].length, j)));
+  }
+  // c) „Aktion: write_file“ mit Zeilen wie „Pfad: …“ und einem Code-Block als Inhalt
+  for (const seg of text.split(/(?=(?:\*\*)?(?:Aktion|Action|Werkzeug|Tool)\s*(?:\*\*)?\s*:)/i)){
+    const nm = /^(?:\*\*)?(?:Aktion|Action|Werkzeug|Tool)\s*(?:\*\*)?\s*:\s*(?:\*\*)?\s*`?([a-z_]+)`?/i.exec(seg);
+    if (!nm || !TOOL_BY_NAME[nm[1]]) continue;
+    const args = {}, body = seg.slice(nm[0].length);
+    const code = /```[^\n]*\n([\s\S]*?)```/.exec(body);
+    for (const line of body.replace(/```[\s\S]*?```/g, '').split('\n')){
+      const kv = /^\s*[-*]?\s*(?:\*\*)?`?([A-Za-zäöüÄÖÜ_]+)`?(?:\*\*)?\s*[:=]\s*(?:\*\*)?\s*(.+?)\s*$/.exec(line);
+      if (kv) args[kv[1].toLowerCase()] = kv[2].replace(/^\*\*|\*\*$/g, '').trim().replace(/^[`"']|[`"']$/g, '');
+    }
+    const n = normArgs(nm[1], args);
+    const props = TOOL_BY_NAME[nm[1]].parameters.properties;
+    if (code){ if (props.content && n.content === undefined) n.content = code[1]; else if (props.command && n.command === undefined) n.command = code[1].trim(); }
+    add(nm[1], n);
+  }
+  return out;
+}
+const mentionsTool = t => !!t && (new RegExp(`\\b(${Object.keys(TOOL_BY_NAME).join('|')})\\b`).test(t) || /(Aktion|Action)\s*:/i.test(t));
+
 /* ---------- Automatisch merken ---------- */
 async function autoRemember(chat){
   try {
     let u = chat.messages.length - 1;
-    while (u >= 0 && chat.messages[u].role !== 'user') u--;
+    while (u >= 0 && (chat.messages[u].role !== 'user' || chat.messages[u].hidden)) u--;
     if (u < 0) return;
     const userMsg = chat.messages[u].content || '';
     const finalA = chat.messages.slice(u).reverse().find(m => m.role === 'assistant' && m.content);
@@ -985,8 +1110,12 @@ function buildMessages(chat, useTools){
   const messages = [];
   let sys = S.system.trim();
   if (useTools) sys = toolSystemPrompt() + (sys ? '\n\nAnweisungen des Nutzers:\n' + sys : '');
+  if (NURO && !useTools){
+    const why = !S.tools ? 'der Nutzer hat sie mit dem 🔧-Schalter ausgeschaltet' : !caps.includes('tools') ? `das Modell ${S.model} unterstützt laut Ollama keine Werkzeuge` : 'sie sind nicht verfügbar';
+    sys = (sys ? sys + '\n\n' : 'Du bist Nuro, ein lokaler KI-Assistent.\n\n') + `Achtung: In diesem Chat stehen dir KEINE Werkzeuge zur Verfügung (${why}). Du kannst keine Dateien lesen oder schreiben, nichts auf GitHub ändern und keine Befehle ausführen. Behaupte das nie und schreibe keine Werkzeugaufrufe als Text. Wenn der Nutzer so etwas möchte, sag ihm, dass er die Werkzeuge über den 🔧-Schalter einschalten bzw. im Modell-Manager ein Modell mit Werkzeug-Unterstützung wählen muss.`;
+  }
   if (NURO){
-    const lastUser = [...chat.messages].reverse().find(m => m.role === 'user');
+    const lastUser = [...chat.messages].reverse().find(m => m.role === 'user' && !m.hidden);
     const mb = memoryBlock(lastUser ? lastUser.content : '');
     if (mb) sys = (sys ? sys + '\n\n' : (useTools ? '' : 'Du bist Nuro, ein lokaler KI-Assistent.\n\n')) + mb;
   }
@@ -1008,7 +1137,7 @@ async function generate(){
   const useTools = toolsOn();
   const maxSteps = Math.max(1, Math.min(100, parseInt(S.maxSteps) || 25));
   abortCtl = new AbortController(); setBusy(true);
-  let a = null;
+  let a = null, nudged = false;
   try {
     for (let step = 0; step < maxSteps; step++){
       a = {role:'assistant', content:'', thinking:'', model:S.model};
@@ -1028,6 +1157,16 @@ async function generate(){
         if (cur === chat) renderLast();
       }, abortCtl.signal);
       a.content = a.content.replace(/^\s+/, '');
+      if (useTools && !calls.length){
+        const fromText = parseTextToolCalls(a.content);
+        if (fromText.length){ calls.push(...fromText); a.textCalls = true; }
+        else if (!nudged && mentionsTool(a.content)){
+          nudged = true; a.textCalls = true;
+          chat.messages.push({role:'user', hidden:true, content:'[Systemhinweis von Nuro] Deine letzte Antwort hat ein Werkzeug nur als Text beschrieben – dadurch ist auf dem PC oder auf GitHub NICHTS passiert. Rufe Werkzeuge ausschließlich über die Funktionsaufruf-Schnittstelle auf (tool_calls), nicht als Text, Code-Block oder „Aktion:“. Führe den Schritt jetzt wirklich aus.'});
+          await saveChat(chat);
+          continue;
+        }
+      }
       if (!calls.length || !useTools) break;
 
       a.tool_calls = calls;
@@ -1036,7 +1175,7 @@ async function generate(){
         const name = tc.function?.name || '';
         let args = tc.function?.arguments || {};
         if (typeof args === 'string'){ try { args = JSON.parse(args); } catch { args = {}; } }
-        const t = {role:'tool', tool_name:name, args, content:'', running:true};
+        const t = {role:'tool', tool_name:name, args, content:'', running:true, fromText:!!tc.fromText};
         chat.messages.push(t);
         if (cur === chat){ const stick = nearBottom(); render(); if (stick) toBottom(); }
         try {
@@ -1274,6 +1413,26 @@ $('#mmPull').onclick = async () => {
   }
 };
 $('#mmCancel').onclick = () => { if (pullCtl) pullCtl.abort(); else $('#mmProg').style.display = 'none'; };
+$('#mmTest').onclick = async () => {
+  const out = $('#mmTestRes');
+  out.className = 'small'; out.textContent = `Teste ${S.model} …`;
+  const tool = fn('get_time', 'Gibt die aktuelle Uhrzeit zurück.', {zone:str('Zeitzone, z. B. Europe/Berlin')}, ['zone']);
+  try {
+    const body = {model:S.model, stream:false, tools:[tool], options:{temperature:0}, messages:[{role:'user', content:'Wie spät ist es in Berlin? Benutze dafür das Werkzeug get_time.'}]};
+    if (caps.includes('thinking')) body.think = false;
+    const r = await fetch(base() + '/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    const native = (j.message?.tool_calls || []).some(c => c.function?.name === 'get_time');
+    const text = j.message?.content || '';
+    if (native){ out.className = 'small ok-t'; out.textContent = `✓ ${S.model} ruft Werkzeuge korrekt über die Schnittstelle auf.`; }
+    else if (/get_time/.test(text)){ out.className = 'small bad-t'; out.textContent = `⚠ ${S.model} schreibt Werkzeug-Aufrufe als Text. Nuro versucht sie zu erkennen, zuverlässiger ist ein anderes Modell (z. B. gpt-oss:20b oder qwen3.5:9b).`; }
+    else { out.className = 'small bad-t'; out.textContent = `✗ ${S.model} hat kein Werkzeug benutzt. Antwort: „${text.slice(0, 120)}“`; }
+  } catch (e) {
+    out.className = 'small bad-t';
+    out.textContent = /does not support tools/i.test(e.message) ? `✗ ${S.model} unterstützt keine Werkzeuge.` : 'Fehler: ' + e.message;
+  }
+};
 $('#mmClose').onclick = () => $('#modelModal').classList.remove('open');
 $('#modelModal').onclick = e => { if (e.target.id === 'modelModal') $('#modelModal').classList.remove('open'); };
 /* ---------- Grafikkarte & Updates (nur in Nuro.exe) ---------- */
@@ -1320,7 +1479,7 @@ function download(name, text, type){
 }
 $('#exportChat').onclick = () => {
   if (!cur) return toast('Kein Chat geöffnet');
-  const t = `# ${cur.title}\n\n` + cur.messages.filter(m => m.role !== 'assistant' || m.content || m.error).map(m =>
+  const t = `# ${cur.title}\n\n` + cur.messages.filter(m => !m.hidden && (m.role !== 'assistant' || m.content || m.error)).map(m =>
     m.role === 'tool' ? `> 🔧 **${TOOL_LABEL[m.tool_name] || m.tool_name}** \`${JSON.stringify(m.args || {})}\` ${m.ok ? '✓' : '✗'}` :
     `## ${m.role === 'user' ? 'Du' : 'Nuro (' + (m.model || '') + ')'}\n\n` + ((m.files || []).map(f => `📄 ${f.name}\n\n`).join('')) + (m.content || m.error || '')).join('\n\n');
   download(cur.title.replace(/[\\/:*?"<>|]/g, '_') + '.md', t, 'text/markdown');
