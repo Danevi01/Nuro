@@ -13,6 +13,7 @@ public sealed class Config
     private static readonly object Sync = new();
 
     public List<string> Folders { get; set; } = new();
+    public List<Project> Projects { get; set; } = new();
     public string Repo { get; set; } = "Danevi01/Nuro";
     public string Branch { get; set; } = "main";
     public string MemoryPath { get; set; } = "";
