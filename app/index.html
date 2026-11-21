@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lokal-Chat</title>
+<title>Nuro</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
 :root{
@@ -147,7 +147,7 @@ details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-
 <body>
 <div id="app">
   <aside id="side">
-    <div class="brand"><img src="icon.svg" alt="">Lokal-Chat</div>
+    <div class="brand"><img src="icon.svg" alt="">Nuro</div>
     <button class="side-btn" id="newChat">＋ Neuer Chat</button>
     <input id="search" placeholder="Chats durchsuchen …">
     <div id="chatlist"></div>
@@ -224,8 +224,8 @@ details.think .tb{padding:2px 14px 10px;color:var(--muted);font-size:14px;white-
 'use strict';
 const $ = s => document.querySelector(s);
 const DEF = {url:'http://127.0.0.1:11434', model:'', system:'', temp:0.7, ctx:8192, theme:'dark', keep:'30m', date:true, think:'auto', sideHidden:false};
-let S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('lc_settings') || '{}'));
-const saveS = () => localStorage.setItem('lc_settings', JSON.stringify(S));
+let S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('nuro_settings') || '{}'));
+const saveS = () => localStorage.setItem('nuro_settings', JSON.stringify(S));
 const base = () => S.url.replace(/\/+$/, '');
 
 let chats = [], cur = null, pending = [], abortCtl = null, caps = [];
@@ -233,7 +233,7 @@ let chats = [], cur = null, pending = [], abortCtl = null, caps = [];
 /* ---------- Speicher (IndexedDB) ---------- */
 let db;
 function openDB(){ return new Promise((res, rej) => {
-  const r = indexedDB.open('lokalchat', 1);
+  const r = indexedDB.open('nuro', 1);
   r.onupgradeneeded = () => r.result.createObjectStore('chats', {keyPath:'id'});
   r.onsuccess = () => { db = r.result; res(); };
   r.onerror = () => rej(r.error);
@@ -655,7 +655,7 @@ $('#sSave').onclick = async () => {
   saveS(); applyTheme(); $('#settings').classList.remove('open'); toast('Gespeichert');
   if (urlChanged) checkOllama();
 };
-$('#exportAll').onclick = () => download(`lokalchat-sicherung-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({settings:S, chats}, null, 1), 'application/json');
+$('#exportAll').onclick = () => download(`nuro-sicherung-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({settings:S, chats}, null, 1), 'application/json');
 $('#importAll').onclick = () => $('#importFile').click();
 $('#importFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;

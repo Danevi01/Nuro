@@ -1,10 +1,10 @@
-LOKAL-CHAT  -  Chat-App fuer Windows mit deinem lokalen Ollama
+NURO  -  Chat-App fuer Windows mit deinem lokalen Ollama
 =============================================================
 
 STARTEN
-  1. Ordner "LokalChat" an einen festen Ort entpacken (z. B. C:\Tools\LokalChat).
+  1. Ordner "Nuro" an einen festen Ort entpacken (z. B. C:\Tools\Nuro).
   2. Einmalig "Verknuepfung-erstellen.bat" doppelklicken
-     -> "Lokal-Chat" erscheint auf dem Desktop und im Startmenue.
+     -> "Nuro" erscheint auf dem Desktop und im Startmenue.
   3. Ab dann einfach ueber die Verknuepfung starten (oder Start.bat).
 
   Die App oeffnet sich als eigenes Fenster (ohne Adressleiste). Falls Ollama
@@ -28,10 +28,10 @@ FUNKTIONEN
 
 DATEN
   Alles bleibt auf deinem PC. Die Chats liegen im App-Profil unter
-  %LOCALAPPDATA%\LokalChat\browser-profil. Nichts geht ins Internet.
+  %LOCALAPPDATA%\Nuro\browser-profil. Nichts geht ins Internet.
 
 TECHNIK
-  - LokalChat.ps1: Mini-Webserver auf http://127.0.0.1:8765 (nur lokal)
+  - Nuro.ps1: Mini-Webserver auf http://127.0.0.1:8765 (nur lokal)
   - app\index.html: die komplette Oberflaeche, spricht direkt mit
     Ollama auf http://127.0.0.1:11434
   - Fenster ueber Microsoft Edge im App-Modus (Chrome als Ersatz)
@@ -41,5 +41,5 @@ PROBLEME?
     Adresse pruefen.
   - Laeuft Ollama auf einem anderen Rechner, muss dort OLLAMA_ORIGINS
     passend gesetzt werden.
-  - Port 8765 belegt: in LokalChat.ps1 oben $Port aendern (Achtung: andere
+  - Port 8765 belegt: in Nuro.ps1 oben $Port aendern (Achtung: andere
     Port-Nummer = andere Chat-Ablage).

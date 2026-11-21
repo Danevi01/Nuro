@@ -1,11 +1,11 @@
-# Lokal-Chat - startet einen kleinen lokalen Webserver und oeffnet die App in einem eigenen Fenster.
+# Nuro - startet einen kleinen lokalen Webserver und oeffnet die App in einem eigenen Fenster.
 # Laeuft nur auf 127.0.0.1 (von aussen nicht erreichbar). Beendet sich, wenn das Fenster geschlossen wird.
 param([int]$Port = 8765)
 
 $ErrorActionPreference = 'Stop'
 $Root      = Join-Path $PSScriptRoot 'app'
 $Url       = "http://127.0.0.1:$Port/"
-$ProfilDir   = Join-Path $env:LOCALAPPDATA 'LokalChat\browser-profil'
+$ProfilDir   = Join-Path $env:LOCALAPPDATA 'Nuro\browser-profil'
 $OllamaUrl = 'http://127.0.0.1:11434/api/version'
 
 function Test-Ollama { try { Invoke-RestMethod -Uri $OllamaUrl -TimeoutSec 2 | Out-Null; $true } catch { $false } }
