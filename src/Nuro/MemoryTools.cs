@@ -11,6 +11,8 @@ public sealed class MemoryTools
 {
     private readonly string _memoryPath;
 
+    public MemoryTools() : this(new Config()) { }
+
     public MemoryTools(Config c)
     {
         _memoryPath = !string.IsNullOrWhiteSpace(c.MemoryPath) 
