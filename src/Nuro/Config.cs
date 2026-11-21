@@ -15,6 +15,7 @@ public sealed class Config
     public List<string> Folders { get; set; } = new();
     public string Repo { get; set; } = "Danevi01/Nuro";
     public string Branch { get; set; } = "main";
+    public string MemoryPath { get; set; } = "";
     public string? TokenData { get; set; }
 
     [JsonIgnore]
